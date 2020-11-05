@@ -1,0 +1,47 @@
+Product,Year,Number of Complaints,Number of Companies,Highest Percentage of Total Complaints Against One Company
+bank account or service,2015,1,1,100
+bank account or service,2016,2,2,50
+checking or savings account,2017,1,1,100
+checking or savings account,2018,20,10,25
+checking or savings account,2019,461,72,13
+checking or savings account,2020,3,3,33
+consumer loan,2015,1,1,100
+consumer loan,2016,1,1,100
+consumer loan,2017,1,1,100
+credit card,2016,4,4,25
+credit card,2017,1,1,100
+credit card or prepaid card,2017,1,1,100
+credit card or prepaid card,2018,27,12,33
+credit card or prepaid card,2019,437,42,15
+credit card or prepaid card,2020,13,10,23
+"credit reporting, credit repair services, or other personal consumer reports",2017,7,5,29
+"credit reporting, credit repair services, or other personal consumer reports",2018,238,22,56
+"credit reporting, credit repair services, or other personal consumer reports",2019,3114,203,50
+"credit reporting, credit repair services, or other personal consumer reports",2020,144,10,51
+debt collection,2015,4,3,50
+debt collection,2016,10,4,60
+debt collection,2017,13,11,15
+debt collection,2018,47,33,15
+debt collection,2019,1130,400,6
+debt collection,2020,27,23,19
+"money transfer, virtual currency, or money service",2017,1,1,100
+"money transfer, virtual currency, or money service",2018,3,3,33
+"money transfer, virtual currency, or money service",2019,87,33,33
+"money transfer, virtual currency, or money service",2020,2,2,50
+mortgage,2015,1,1,100
+mortgage,2016,1,1,100
+mortgage,2017,3,3,33
+mortgage,2018,39,27,10
+mortgage,2019,415,98,10
+mortgage,2020,6,6,17
+payday loan,2016,1,1,100
+"payday loan, title loan, or personal loan",2018,7,2,86
+"payday loan, title loan, or personal loan",2019,84,54,6
+"payday loan, title loan, or personal loan",2020,1,1,100
+student loan,2018,2,2,50
+student loan,2019,157,37,37
+student loan,2020,1,1,100
+vehicle loan or lease,2017,2,2,50
+vehicle loan or lease,2018,10,9,20
+vehicle loan or lease,2019,90,47,7
+vehicle loan or lease,2020,2,2,50
