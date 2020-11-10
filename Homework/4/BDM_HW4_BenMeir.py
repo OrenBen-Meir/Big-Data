@@ -3,7 +3,7 @@ from pyspark.sql import functions as F, Row
 import sys
 
 
-def py3_solution():
+def py3_solution(): # python3 solution (worked in newer pyspark version, nyu hadoop cluster uses an older version so not compatible)
     sc = SparkContext()
     sqlContext = SQLContext(sc)
 
@@ -82,7 +82,8 @@ def py2_solution():
     rdd_result.saveAsTextFile(sys.argv[2] if len(sys.argv)>2 else 'report')
 
 if __name__ == '__main__':
-    if sys.version_info[0] == 3: # if python3
-        py3_solution()
-    else: # if python2
-        py2_solution()
+    py2_solution()
+    # if sys.version_info[0] == 3: # if python3
+    #     py3_solution()
+    # else: # if python2
+    #     py2_solution()
