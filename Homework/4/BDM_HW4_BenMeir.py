@@ -46,7 +46,7 @@ def py3_solution(): # python3 solution
             F.max("count").alias("highest complaints"))\
         .orderBy("product", "year")\
         .withColumn("highest percentage", F.round(100*F.col("highest complaints")/F.col("Number of complaints")))\
-        .drop(F.col("highest complaints")).cache()
+        .drop(F.col("highest complaints"))
     
     # df_report.toPandas().to_csv("report.csv")
     # df_report.show()
