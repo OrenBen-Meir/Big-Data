@@ -52,8 +52,8 @@ def py2_solution():
 
     rows = sc.textFile(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv')\
         .mapPartitionsWithIndex(parseCSV).cache()
-    
-    rdd_aggr = rows.countByKey()\
+
+    rdd_aggr = rows.reduceByKey(lambda x,y: x+y)\
         .map(lambda x: ((x[0][0], x[0][1]), x[1]))\
         .groupByKey().map(aggr_row_data).cache()
     
