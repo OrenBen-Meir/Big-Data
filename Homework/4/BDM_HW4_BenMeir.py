@@ -26,7 +26,7 @@ def py3_solution(): # python3 solution
         StructField('company', StringType(), True)])
 
     rows = sc.textFile(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv')\
-        .mapPartitionsWithIndex(parseCSV).cache()
+        .mapPartitionsWithIndex(parseCSV)
     
     df = sqlContext.createDataFrame(rows, schema)
 
@@ -49,8 +49,8 @@ def py3_solution(): # python3 solution
         .drop(F.col("highest complaints"))
     
     # df_report.toPandas().to_csv("report.csv")
-    # df_report.show()
-    df_report.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
+    df_report.show()
+    # df_report.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
 
 def py2_solution(): # python2 solution
     sc = SparkContext()
