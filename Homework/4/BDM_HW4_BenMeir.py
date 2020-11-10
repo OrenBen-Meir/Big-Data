@@ -1,6 +1,6 @@
 from pyspark import SparkContext, SQLContext
 from pyspark.sql import functions as F, Row
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.types import StructType, StructField, StringType
 import sys
 
 
@@ -16,13 +16,13 @@ def py3_solution(): # python3 solution
             if p[1] != None and p[7] != None:
                 try:
                     yield Row(product=p[1].upper(), 
-                        year=datetime.datetime.strptime(p[0], '%Y-%m-%d').year, 
+                        year=str(datetime.datetime.strptime(p[0], '%Y-%m-%d').year), 
                         company=p[7])
                 except:
                     pass
 
     schema = StructType([StructField('product', StringType(), True),\
-        StructField('year', IntegerType(), True),\
+        StructField('year', StringType(), True),\
         StructField('company', StringType(), True)])
 
     rows = sc.textFile(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv')\
