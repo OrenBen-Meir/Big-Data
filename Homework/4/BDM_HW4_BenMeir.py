@@ -48,7 +48,7 @@ def py3_solution(): # python3 solution
         .drop(F.col("highest complaints"))
     
     # df_report.toPandas().to_csv("report.csv")
-    # df_report.show()
+    df_report.show()
     df_report.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
 
 def py2_solution(): # python2 solution
@@ -70,7 +70,7 @@ def py2_solution(): # python2 solution
         year =x[0][1]
         total_complaints = sum(x[1])
         total_companies = len(x[1])
-        highest_percent = round(100*max(x[1])/total_complaints)
+        highest_percent = round(100*max(x[1])/float(total_complaints))
         return (product, year, total_complaints, total_companies, highest_percent)
 
     df = sqlContext.read.csv(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv', multiLine=True, \
