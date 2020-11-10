@@ -1,5 +1,4 @@
 from pyspark import SparkContext, SQLContext
-from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql import functions as F, Row
 import sys
 
