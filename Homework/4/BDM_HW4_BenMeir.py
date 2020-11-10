@@ -48,8 +48,8 @@ def py3_solution(): # python3 solution
         .drop(F.col("highest complaints"))
     
     # df_report.toPandas().to_csv("report.csv")
-    df_report.show()
-    # df_report.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
+    # df_report.show()
+    df_report.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
 
 def py2_solution(): # python2 solution
     sc = SparkContext()
