@@ -1,19 +1,44 @@
 from pyspark import SparkContext, SQLContext
 from pyspark.sql import functions as F, Row
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 import sys
 
 
-def py3_solution(): # python3 solution (worked in newer pyspark version, nyu hadoop cluster uses an older version so not compatible)
+def py3_solution(): # python3 solution
     sc = SparkContext()
     sqlContext = SQLContext(sc)
 
-    df = sqlContext.read.csv(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv', multiLine=True, \
-        header=True, escape="\"", inferSchema=True, lineSep="\n")
+    def parseCSV(indx, part):
+        import csv, datetime
+        if indx == 0:
+            next(part)
+        for p in csv.reader(part):
+            if p[1] != None and p[7] != None:
+                try:
+                    yield Row(product=p[1].upper(), 
+                        year=datetime.datetime.strptime(p[0], '%Y-%m-%d').year, 
+                        company=p[7])
+                except e:
+                        pass
+
+    schema = StructType([StructField('product', StringType(), True),\
+        StructField('year', IntegerType(), True),\
+        StructField('company', StringType(), True)])
+
+    rows = sc.textFile(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv')\
+        .mapPartitionsWithIndex(parseCSV).cache()
+    
+    df = sqlContext.createDataFrame(rows, schema)
+
+    # df = sqlContext.read.csv(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv', multiLine=True, \
+    #     header=True, escape="\"", inferSchema=True, lineSep="\n")
 
     # print(df.columns)
+    # df.show()
+    # df_prodyearcomp = df.select(F.upper("Product").alias("product"), F.year("Date received").alias("year"), F.col("Company"))\
+    #     .groupBy(F.col("product"), F.col("year"), F.col("Company")).count()
     
-    df_prodyearcomp = df.select(F.upper("Product").alias("product"), F.year("Date received").alias("year"), F.col("Company"))\
-        .groupBy(F.col("product"), F.col("year"), F.col("Company")).count()
+    df_prodyearcomp = df.groupBy(F.col("product").alias("product"), F.col("year"), F.col("Company")).count()
             
     df_report = df_prodyearcomp.groupBy(F.col("product"), F.col("year"))\
         .agg(F.sum("count").alias("Number of complaints"),\
@@ -23,22 +48,13 @@ def py3_solution(): # python3 solution (worked in newer pyspark version, nyu had
         .withColumn("highest percentage", F.round(100*F.col("highest complaints")/F.col("Number of complaints")))\
         .drop(F.col("highest complaints"))
     
-    # df_report.toPan/das().to_csv("report.csv")
+    # df_report.toPandas().to_csv("report.csv")
     # df_report.show()
     df_report.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
 
-def py2_solution():
+def py2_solution(): # python2 solution
     sc = SparkContext()
     sqlContext = SQLContext(sc)
-
-    # def parseCSV(indx, part):
-    #     import csv, datetime
-    #     if indx == 0:
-    #         part.next()
-    #     for p in csv.reader(part):
-    #         year = datetime.datetime.strptime(p[0], '%Y-%m-%d').year
-    #         product, company= p[1], p[7]
-    #         yield (product, year, company), 1
     
     def map_row(row):
         try:
@@ -82,8 +98,7 @@ def py2_solution():
     rdd_result.saveAsTextFile(sys.argv[2] if len(sys.argv)>2 else 'report')
 
 if __name__ == '__main__':
-    py2_solution()
-    # if sys.version_info[0] == 3: # if python3
-    #     py3_solution()
-    # else: # if python2
-    #     py2_solution()
+    if sys.version_info[0] == 3: # if python3
+        py3_solution()
+    else: # if python2
+        py2_solution()
