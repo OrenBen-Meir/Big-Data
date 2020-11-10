@@ -77,7 +77,7 @@ def py2_solution():
     rdd_result.saveAsTextFile(sys.argv[2] if len(sys.argv)>2 else 'report')
 
 if __name__ == '__main__':
-    if sys.version_info[0] == 3:
+    if sys.version_info[0] == 3: # if python3
         py3_solution()
-    else:
+    else: # if python2
         py2_solution()
