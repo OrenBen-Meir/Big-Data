@@ -13,13 +13,12 @@ def py3_solution(): # python3 solution
         if indx == 0:
             next(part)
         for p in csv.reader(part):
-            if p[1] != None and p[7] != None:
-                try:
-                    yield Row(product=p[1].upper(), 
-                        year=str(datetime.datetime.strptime(p[0], '%Y-%m-%d').year), 
-                        company=p[7])
-                except:
-                    pass
+            try:
+                yield Row(product=p[1].upper(), 
+                    year=str(datetime.datetime.strptime(p[0], '%Y-%m-%d').year), 
+                    company=p[7])
+            except:
+                pass
 
     schema = StructType([StructField('product', StringType(), True),\
         StructField('year', StringType(), True),\
