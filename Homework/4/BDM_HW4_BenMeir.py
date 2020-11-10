@@ -32,36 +32,37 @@ def py2_solution():
     sqlContext = SQLContext(sc)
 
     def parseCSV(indx, part):
-        import csv
+        import csv, datetime
         if indx == 0:
             part.next()
         for p in csv.reader(part):
-            year = datetime.datetime.strptime(row[0], '%Y-%m-%d').year
-            yield Row(product=p[1].upper(), year=year, company=p[7])
+            year = datetime.datetime.strptime(p[0], '%Y-%m-%d').year
+            product, company= p[1], p[7]
+            yield (product, year, company), 1
     
     def aggr_row_data(x):
-        complaints = sum(x[1])
-        return Row(
-            product=x[0][0].upper(),
-            year=x[0][1],
-            companies = len(x[1]),
-            complaints=complaints,
-            highest_percent = round(100*max(x[1])/complaints)
-        )
+        product=x[0][0].upper()
+        year =x[0][1]
+        total_complaints = sum(x[1])
+        total_companies = len(x[1])
+        highest_percent = round(100*max(x[1])/total_complaints)
+
+        return ",".join([str(x) for x in [product, year, total_complaints, total_companies, highest_percent]])
+        
 
     rows = sc.textFile(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv')\
         .mapPartitionsWithIndex(parseCSV).cache()
     
-    df = sqlContext.createDataFrame(rows)
-    df1 = df.select(F.col("product"), F.col("year"), F.col("Company"))\
-        .groupBy(F.col("product"), F.col("year"), F.col("Company")).count().cache()
-    rdd1 = df.rdd.map(lambda x: ((x.product, x.year), (x.count, 1))).groupByKey()\
-        .map(aggr_row_data).cache()
-    df2 = sqlContext.createDataFrame(rdd2)
-
-    df2.toPandas().to_csv("report.csv")
-    # df2.show()
-    df2.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
+    rdd_aggr = rows.reduceByKey(lambda x,y: x+y)\
+        .map(lambda x: ((x[0][0], x[0][1]), x[1]))\
+        .groupByKey().map(aggr_row_data).cache()
+    
+    rdd_result_heading = sc.parallelize(["product,year,total_complaints,total_companies,highest_percent"])
+    
+    rdd_result = rdd_result_heading.union(rdd_aggr)
+    # for x in rdd_result.collect():
+    #     print x
+    rdd_result.saveAsTextFile(sys.argv[2] if len(sys.argv)>2 else 'report')
 
 if __name__ == '__main__':
     if sys.version_info[0] == 3:
