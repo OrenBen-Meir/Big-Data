@@ -2,6 +2,9 @@ from pyspark import SparkContext, SQLContext
 from pyspark.sql import functions as F, Row
 from pyspark.sql.types import StructType, StructField, StringType
 import sys
+# This python file has a python2 solution and a python3 solution.
+# py2 solution is more rdd focused while the py3 solution is more sql focused.
+# These 2 solutions are a result of fixing compatibility issues in deploying to the the nyu hadoop cluster.
 
 
 def py3_solution(): # python3 solution
