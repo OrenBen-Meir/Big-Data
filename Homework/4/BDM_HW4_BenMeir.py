@@ -51,7 +51,7 @@ def py2_solution():
     
     
     def aggr_row_data(x):
-        product=x[0][0].upper()
+        product="\"" + x[0][0].upper() + "\""
         year =x[0][1]
         total_complaints = sum(x[1])
         total_companies = len(x[1])
