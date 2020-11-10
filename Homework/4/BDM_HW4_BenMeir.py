@@ -23,7 +23,7 @@ def py3_solution():
         .withColumn("highest percentage", F.round(100*F.col("highest complaints")/F.col("Number of complaints")))\
         .drop(F.col("highest complaints"))
     
-    df_report.toPandas().to_csv("report.csv")
+    # df_report.toPan/das().to_csv("report.csv")
     # df_report.show()
     df_report.write.csv(sys.argv[2] if len(sys.argv)>2 else 'report', header=True)
 
