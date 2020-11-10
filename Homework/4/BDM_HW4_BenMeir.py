@@ -28,14 +28,6 @@ def py3_solution(): # python3 solution
         .mapPartitionsWithIndex(parseCSV)
     
     df = sqlContext.createDataFrame(rows, schema)
-
-    # df = sqlContext.read.csv(sys.argv[1] if len(sys.argv)>1 else 'complaints_small.csv', multiLine=True, \
-    #     header=True, escape="\"", inferSchema=True, lineSep="\n")
-
-    # print(df.columns)
-    # df.show()
-    # df_prodyearcomp = df.select(F.upper("Product").alias("product"), F.year("Date received").alias("year"), F.col("Company"))\
-    #     .groupBy(F.col("product"), F.col("year"), F.col("Company")).count()
     
     df_prodyearcomp = df.groupBy(F.col("product").alias("product"), F.col("year"), F.col("Company")).count()
             
@@ -78,8 +70,6 @@ def py2_solution(): # python2 solution
             .select(F.col("Date received"), F.col("Product"), F.col("Company")).cache()
 
     # df.show()
-    # for x in df.rdd.take(20):
-    #     print x
 
     rdd_complaints = df.rdd.map(map_row).filter(lambda x: x!=None)
 
