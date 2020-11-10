@@ -41,8 +41,13 @@ def py2_solution():
     #         yield (product, year, company), 1
     
     def map_row(row):
-        year = row["Date received"].year
-        return (row["Product"], year, row["Company"]), 1
+        try:
+            year = row["Date received"].year
+            if row["Product"] == None or row["Company"] == None:
+                raise Exception("")
+            return (row["Product"], year, row["Company"]), 1
+        except:
+            return None
     
     
     def aggr_row_data(x):
@@ -61,7 +66,7 @@ def py2_solution():
     # for x in df.rdd.take(20):
     #     print x
 
-    rdd_complaints = df.rdd.map(map_row)
+    rdd_complaints = df.rdd.map(map_row).filter(lambda x: x!=None)
 
     rdd_aggr = rdd_complaints.reduceByKey(lambda x,y: x+y)\
         .map(lambda x: ((x[0][0], x[0][1]), x[1]))\
