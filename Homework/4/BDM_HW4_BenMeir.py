@@ -18,7 +18,7 @@ def py3_solution(): # python3 solution
                     yield Row(product=p[1].upper(), 
                         year=datetime.datetime.strptime(p[0], '%Y-%m-%d').year, 
                         company=p[7])
-                except e:
+                except:
                         pass
 
     schema = StructType([StructField('product', StringType(), True),\
