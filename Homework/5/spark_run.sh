@@ -9,5 +9,5 @@ hdfs dfs -getmerge oren_final_output oren_final_output.csv
 hdfs dfs -put oren_final_output.csv oren_final_output.csv
 
 hdfs dfs -rmr oren_final_output
-rm final_output.csv
+rm oren_final_output.csv
 
