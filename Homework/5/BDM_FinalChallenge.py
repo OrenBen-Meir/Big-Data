@@ -1,6 +1,6 @@
 from pyspark import SparkContext, SQLContext, RDD
 from pyspark.sql import functions as F, Row, DataFrame
-from pyspark.sql.types import StructType, StructField, LongType, StringType, IntegerType
+from pyspark.sql.types import StructType, StructField, LongType, StringType
 import sys
 import os
 
