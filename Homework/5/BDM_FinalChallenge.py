@@ -8,7 +8,8 @@ def csv_df(sqlContext, filepath):
     return sqlContext.read.csv(filepath, multiLine=True, header=True, escape="\"", inferSchema=True)
 
 def violation_data_df(sparkcontext, sqlContext, *filenames):
-    rdds = [
+    filenames = ["2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv"]
+    violation_rdds = [
         csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", fname))\
             .select(F.col("House Number"),F.col("Street Name"), F.col("Violation County"),\
                 F.year(F.to_date(F.split(F.col("Issue Date"), ",")[0], "MM/dd/yyyy")).alias("year"))\
@@ -19,16 +20,39 @@ def violation_data_df(sparkcontext, sqlContext, *filenames):
         StructField('Street Name', StringType(), True),\
         StructField('Violation County', StringType(), True),\
         StructField('year', IntegerType(), True)])
-    rdd = sparkcontext.union(rdds)
-    return sqlContext.createDataFrame(rdd, schema)
+    rdd_violations = sparkcontext.union(violation_rdds)
+    return sqlContext.createDataFrame(rdd_violations, schema)
 
 if __name__ == "__main__":
     sc = SparkContext()
     sqlContext = SQLContext(sc)
 
-    df_violations = violation_data_df(sc, sqlContext, "2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv")
-    df_violations = df_violations.filter("2015 <= year and year <= 2019 and int(`House Number`) is not null and \
-        `Street Name` is not null")
+    @F.udf("string")
+    def sql_to_upper(x):
+        if x == None:
+            return None
+        return x.upper()
+    sqlContext.registerFunction("to_upper", sql_to_upper)
+
+    filenames = ["2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv"]
+    violation_rdds = [
+        csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", fname)).rdd
+        for fname in filenames
+    ]
+    
+    def map_row_add_year(x):
+        from datetime import datetime
+        from pyspark.sql import Row
+        row_builder = x.asDict()
+        if x["Issue Date"] is not None:
+            row_builder["year"] = datetime.strptime(row_builder["Issue Date"].split(",")[0], "%m/%d/%Y").year
+        if x["Street Name"] is not None:
+            row_builder["Street Name"] = row_builder["Street Name"].upper()
+        return Row(**row_builder)
+    rdd_violations = sc.union(violation_rdds)\
+        .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]])\
+        .map(map_row_add_year)\
+        .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)
 
     df_nyc_cscl = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
         .select("PHYSICALID", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")
@@ -39,42 +63,31 @@ if __name__ == "__main__":
             boro = county_to_boro_codes.get(row["Violation County"], None)
             if boro == None:
                 continue
-            yield (row["Street Name"].upper(), boro), row
+            yield (row["Street Name"], boro), row
         
-    rdd_violations = df_violations.rdd.mapPartitions(map_partitions_to_rdd_violations)
+    rdd_violations = rdd_violations.mapPartitions(map_partitions_to_rdd_violations)
     rdd_nyc_cscl = df_nyc_cscl.rdd.map(lambda x: ((x["ST_LABEL"], x["BOROCODE"]), x))
 
     rdd_cscl_violations = rdd_nyc_cscl.join(rdd_violations)
 
-    def map_partitions_to_phys_id_and_year(items):
-        def cscl_house_number_limits_is_number(c_row):
-            for field in ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"]:
-                v = c_row[field]
-                try:
-                    if v == None or not v.isdigit():
-                        return False
-                except:
-                    return False
-            return True
-                
+    def map_partitions_to_phys_id_and_year(items):                
         for x in items:
             v = x[1]
             cscl_row = v[0]
             violation_row = v[1]
             try:
                 house_number = int(violation_row["House Number"])
-            except:
+                if ((house_number%2 == 1 and int(cscl_row["L_LOW_HN"]) <= house_number and house_number <= int(cscl_row["L_HIGH_HN"])) or \
+                    (house_number%2 == 0 and int(cscl_row["R_LOW_HN"]) <= house_number and house_number <= int(cscl_row["R_HIGH_HN"]))):
+                    yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
+            except (ValueError, TypeError) as e:
                 continue
-            if cscl_house_number_limits_is_number(cscl_row) and \
-                ((house_number%2 == 1 and int(cscl_row["L_LOW_HN"]) <= house_number and house_number <= int(cscl_row["L_HIGH_HN"])) or \
-                (house_number%2 == 0 and int(cscl_row["R_LOW_HN"]) <= house_number and house_number <= int(cscl_row["R_HIGH_HN"]))):
-                yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
     
     def map_to_output_row(entry):
-        ols_coeff = "-"
+        ols_coeff = "NaN"
         year_counts = dict(entry[1])
-        return [entry[0], year_counts.get(2015, "-"), year_counts.get(2016, "-"), year_counts.get(2017, "-"), \
-            year_counts.get(2018, "-"), year_counts.get(2019, "-"), ols_coeff]
+        return [entry[0], year_counts.get(2015, "NaN"), year_counts.get(2016, "NaN"), year_counts.get(2017, "NaN"), \
+            year_counts.get(2018, "NaN"), year_counts.get(2019, "NaN"), ols_coeff]
                 
     rdd_location_year_counts: RDD = rdd_cscl_violations.mapPartitions(map_partitions_to_phys_id_and_year)\
         .reduceByKey(lambda x, y: x + y).map(lambda x: (x[0][0], (x[0][1], x[1])))\
