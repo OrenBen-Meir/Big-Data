@@ -61,7 +61,10 @@ if __name__ == "__main__":
             v = x[1]
             cscl_row = v[0]
             violation_row = v[1]
-            house_number = int(violation_row["House Number"])
+            try:
+                house_number = int(violation_row["House Number"])
+            except:
+                continue
             if cscl_house_number_limits_is_number(cscl_row) and \
                 ((house_number%2 == 1 and int(cscl_row["L_LOW_HN"]) <= house_number and house_number <= int(cscl_row["L_HIGH_HN"])) or \
                 (house_number%2 == 0 and int(cscl_row["R_LOW_HN"]) <= house_number and house_number <= int(cscl_row["R_HIGH_HN"]))):
