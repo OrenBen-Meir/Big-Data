@@ -1,6 +1,6 @@
 from pyspark import SparkContext, SQLContext, RDD
 from pyspark.sql import functions as F, Row, DataFrame
-from pyspark.sql.types import StructType, StructField, LongType, StringType
+from pyspark.sql.types import StructType, StructField, LongType, StringType, IntegerType
 import sys
 import os
 
@@ -50,7 +50,10 @@ if __name__ == "__main__":
         def cscl_house_number_limits_is_number(c_row):
             for field in ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"]:
                 v = c_row[field]
-                if v == None or not v.isdigit():
+                try:
+                    if v == None or not v.isdigit():
+                        return False
+                except:
                     return False
             return True
                 
