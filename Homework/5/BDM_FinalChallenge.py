@@ -16,13 +16,14 @@ if __name__ == "__main__":
     sc = SparkContext()
     sqlContext = SQLContext(sc)
     df_violations = violation_data_df(sqlContext, "2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv")\
-        .select(F.col("Summons Number"), F.col("House Number"),\
-            F.col("Street Name"), F.col("Violation County"),\
+        .select(F.col("House Number"),F.col("Street Name"), F.col("Violation County"),\
             F.year(F.to_date(F.split(F.col("Issue Date"), ",")[0], "MM/dd/yyyy")).alias("year"))
-    df_violations = df_violations.filter("2015 <= year and year <= 2019 and int(`House Number`) is not null")
+    df_violations = df_violations.filter("2015 <= year and year <= 2019 and int(`House Number`) is not null and \
+        `Street Name` is not null")
 
     df_nyc_cscl = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
-        .select("PHYSICALID", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")
+        .select("PHYSICALID", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
+        .filter("`ST_LABEL` is not null and `BOROCODE` is not null")
 
     def map_partitions_to_rdd_violations(rows):
         county_to_boro_codes = {"NY": 1, "BX": 2, "BK": 3, "Q": 4, "ST": 5}
@@ -50,7 +51,7 @@ if __name__ == "__main__":
             cscl_row = v[0]
             violation_row = v[1]
             house_number = int(violation_row["House Number"])
-            if cscl_house_number_limits_is_number(cscl_row) and \
+            if cscl_row["PHYSICALID"] != None and cscl_house_number_limits_is_number(cscl_row) and \
                 ((house_number%2 == 1 and int(cscl_row["L_LOW_HN"]) <= house_number and house_number <= int(cscl_row["L_HIGH_HN"])) or \
                 (house_number%2 == 0 and int(cscl_row["R_LOW_HN"]) <= house_number and house_number <= int(cscl_row["R_HIGH_HN"]))):
                 yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
@@ -75,5 +76,5 @@ if __name__ == "__main__":
     
     df_output = sqlContext.createDataFrame(rdd_location_year_counts, schema=output_schema)
     
-    df_output.show()
+    # df_output.show()
     df_output.write.csv(sys.argv[3] if len(sys.argv) > 3 else 'final_output', header=False)
