@@ -1,23 +1,31 @@
 from pyspark import SparkContext, SQLContext, RDD
 from pyspark.sql import functions as F, Row, DataFrame
-from pyspark.sql.types import StructType, StructField, LongType, StringType
+from pyspark.sql.types import StructType, StructField, LongType, StringType, IntegerType
 import sys
 import os
 
 def csv_df(sqlContext, filepath):
     return sqlContext.read.csv(filepath, multiLine=True, header=True, escape="\"", inferSchema=True)
 
-def violation_data_df(sqlContext, *filenames):
+def violation_data_df(sparkcontext, sqlContext, *filenames):
     from functools import reduce
-    dfs = [csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", fname)) for fname in filenames]
-    return reduce(DataFrame.unionAll, dfs)
+    rdds = [csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", fname))\
+        .select(F.col("House Number"),F.col("Street Name"), F.col("Violation County"),\
+            F.year(F.to_date(F.split(F.col("Issue Date"), ",")[0], "MM/dd/yyyy")).alias("year"))\
+        .rdd
+        for fname in filenames]
+
+    schema = StructType([StructField('House Number', StringType(), True),\
+        StructField('Street Name', StringType(), True),\
+        StructField('Violation County', StringType(), True),\
+        StructField('year', IntegerType(), True)])
+    rdd = sparkcontext.union(rdds)
+    return sqlContext.createDataFrame(rdd, schema)
 
 if __name__ == "__main__":
     sc = SparkContext()
     sqlContext = SQLContext(sc)
-    df_violations = violation_data_df(sqlContext, "2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv")\
-        .select(F.col("House Number"),F.col("Street Name"), F.col("Violation County"),\
-            F.year(F.to_date(F.split(F.col("Issue Date"), ",")[0], "MM/dd/yyyy")).alias("year"))
+    df_violations = violation_data_df(sc, sqlContext, "2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv")
     df_violations = df_violations.filter("2015 <= year and year <= 2019 and int(`House Number`) is not null and \
         `Street Name` is not null")
 
