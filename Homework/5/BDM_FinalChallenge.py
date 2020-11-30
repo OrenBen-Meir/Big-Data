@@ -1,6 +1,6 @@
 from pyspark import SparkContext, SQLContext, RDD
 from pyspark.sql import functions as F, Row, DataFrame
-from pyspark.sql.types import StructType, StructField, LongType
+from pyspark.sql.types import StructType, StructField, LongType, StringType
 import sys
 import os
 
@@ -58,22 +58,22 @@ if __name__ == "__main__":
     def map_to_output_row(entry):
         ols_coeff = None
         year_counts = dict(entry[1])
-        return [entry[0], year_counts.get(2015, None), year_counts.get(2016, None), year_counts.get(2017, None), \
-            year_counts.get(2018, None), year_counts.get(2019, None), ols_coeff]
+        return [entry[0], year_counts.get(2015, "-"), year_counts.get(2016, "-"), year_counts.get(2017, "-"), \
+            year_counts.get(2018, "-"), year_counts.get(2019, "-"), ols_coeff]
                 
     rdd_location_year_counts: RDD = rdd_cscl_violations.mapPartitions(map_partitions_to_phys_id_and_year)\
         .reduceByKey(lambda x, y: x + y).map(lambda x: (x[0][0], (x[0][1], x[1])))\
         .groupByKey().sortByKey().map(map_to_output_row)
     
     output_schema = StructType([StructField('PHYSICALID', LongType(), True),\
-        StructField('COUNT_2015', LongType(), True),\
-        StructField('COUNT_2016', LongType(), True),\
-        StructField('COUNT_2017', LongType(), True),\
-        StructField('COUNT_2018', LongType(), True),\
-        StructField('COUNT_2019', LongType(), True),\
-        StructField('OLS_COEF', LongType(), True)])
+        StructField('COUNT_2015', StringType(), True),\
+        StructField('COUNT_2016', StringType(), True),\
+        StructField('COUNT_2017', StringType(), True),\
+        StructField('COUNT_2018', StringType(), True),\
+        StructField('COUNT_2019', StringType(), True),\
+        StructField('OLS_COEF', StringType(), True)])
     
     df_output = sqlContext.createDataFrame(rdd_location_year_counts, schema=output_schema)
     
-    df_output.show()
-    df_output.write.csv('final_output', header=False)
+    # df_output.show()
+    df_output.write.csv(sys.argv[3] if len(sys.argv) > 3 else 'final_output', header=False)
