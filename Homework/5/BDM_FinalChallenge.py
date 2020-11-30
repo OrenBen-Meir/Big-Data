@@ -56,7 +56,7 @@ if __name__ == "__main__":
                 yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
     
     def map_to_output_row(entry):
-        ols_coeff = None
+        ols_coeff = "-"
         year_counts = dict(entry[1])
         return [entry[0], year_counts.get(2015, "-"), year_counts.get(2016, "-"), year_counts.get(2017, "-"), \
             year_counts.get(2018, "-"), year_counts.get(2019, "-"), ols_coeff]
@@ -75,5 +75,5 @@ if __name__ == "__main__":
     
     df_output = sqlContext.createDataFrame(rdd_location_year_counts, schema=output_schema)
     
-    # df_output.show()
+    df_output.show()
     df_output.write.csv(sys.argv[3] if len(sys.argv) > 3 else 'final_output', header=False)
