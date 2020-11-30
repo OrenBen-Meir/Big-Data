@@ -8,7 +8,6 @@ def csv_df(sqlContext, filepath):
     return sqlContext.read.csv(filepath, multiLine=True, header=True, escape="\"", inferSchema=True)
 
 def violation_data_df(sparkcontext, sqlContext, *filenames):
-    from functools import reduce
     rdds = [csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", fname))\
         .select(F.col("House Number"),F.col("Street Name"), F.col("Violation County"),\
             F.year(F.to_date(F.split(F.col("Issue Date"), ",")[0], "MM/dd/yyyy")).alias("year"))\
