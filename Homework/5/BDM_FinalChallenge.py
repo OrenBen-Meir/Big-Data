@@ -73,13 +73,11 @@ if __name__ == "__main__":
             top = n*np.sum(arr_x*arr_y) - np.sum(arr_x)*np.sum(arr_y)
             return str(round(top/bottom, 2))
         year_counts = dict(entry[1])
-        entry_list = list(entry[1])
         for year in range(2015,2020):
             if year not in year_counts:
-                entry_list.append((year, 0))
-        ols_coeff = calc_ols_coeff(list(entry[1]))
-        return [entry[0], year_counts.get(2015, 0), year_counts.get(2016, 0), year_counts.get(2017, 0), \
-            year_counts.get(2018, 0), year_counts.get(2019, 0), ols_coeff]
+                year_counts[year] = 0
+        return [entry[0], year_counts[2015], year_counts[2016], year_counts[2017], \
+            year_counts[2018], year_counts[2019], calc_ols_coeff(list(year_counts.items()))]
     
     rdd_location_year_counts: RDD = rdd_nyc_cscl.union(rdd_violations).sortByKey()\
         .mapPartitions(map_partitions_cscl_violations)\
