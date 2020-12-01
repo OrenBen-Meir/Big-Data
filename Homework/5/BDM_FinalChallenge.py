@@ -74,8 +74,8 @@ if __name__ == "__main__":
             return str(round(top/bottom, 2))
         ols_coeff = calc_ols_coeff(list(entry[1]))
         year_counts = dict(entry[1])
-        return [entry[0], year_counts.get(2015, "N/A"), year_counts.get(2016, "N/A"), year_counts.get(2017, "N/A"), \
-            year_counts.get(2018, "N/A"), year_counts.get(2019, "N/A"), ols_coeff]
+        return [entry[0], year_counts.get(2015, 0), year_counts.get(2016, 0), year_counts.get(2017, 0), \
+            year_counts.get(2018, 0), year_counts.get(2019, 0), ols_coeff]
     
     rdd_location_year_counts: RDD = rdd_nyc_cscl.union(rdd_violations).sortByKey()\
         .mapPartitions(map_partitions_cscl_violations)\
