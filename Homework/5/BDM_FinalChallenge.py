@@ -22,18 +22,18 @@ if __name__ == "__main__":
     rdd_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County").rdd\
         .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]] and \
-            x["Violation County"] in ["NY", "BX", "BK", "Q", "ST"])\
+            x["Violation County"] in {"NY", "BX", "BK", "Q", "ST"})\
         .map(map_row_add_year)\
         .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)\
-        .map(lambda x: (' '.join(x["Street Name"].upper().split()), x))\
-        .groupByKey().map(lambda x: (' '.join(x[0].split()), (1, x[1])))
+        .map(lambda x: ((' '.join(x["Street Name"].upper().split()), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), x))\
+        .groupByKey().map(lambda x: (x[0], (1, x[1])))
 
     rdd_nyc_cscl = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
         .select("PHYSICALID", "FULL_STREE", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
         .rdd\
         .filter(lambda x: None not in [
             x["PHYSICALID"], x["FULL_STREE"], x["BOROCODE"], x["L_LOW_HN"], x["L_HIGH_HN"], x["R_LOW_HN"], x["R_HIGH_HN"]])\
-        .map(lambda x: (' '.join(x["FULL_STREE"].split()), x)).groupByKey().map(lambda x: (x[0], (0, x[1])))
+        .map(lambda x: ((' '.join(x["FULL_STREE"].split()), x["BOROCODE"]), x)).groupByKey().map(lambda x: (x[0], (0, x[1])))
 
     def map_partitions_cscl_violations(records):
         last_cscls = None
