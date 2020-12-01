@@ -8,6 +8,6 @@ spark-submit \
 hdfs dfs -getmerge oren_final_output oren_final_output.csv
 hdfs dfs -put oren_final_output.csv oren_final_output.csv
 
-hdfs dfs -rmr oren_final_output
+hdfs dfs -rm -r oren_final_output
 rm oren_final_output.csv
 
