@@ -10,12 +10,6 @@ def csv_df(sqlContext, filepath):
 if __name__ == "__main__":
     sc = SparkContext()
     sqlContext = SQLContext(sc)
-
-    filenames = ["2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv"]
-    violation_rdds = [
-        csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", fname)).rdd
-        for fname in filenames
-    ]
     
     def map_row_add_year(x):
         from datetime import datetime
@@ -25,7 +19,8 @@ if __name__ == "__main__":
             row_dict["year"] = datetime.strptime(row_dict["Issue Date"].split(",")[0], "%m/%d/%Y").year
         return row_dict
 
-    rdd_violations = sc.union(violation_rdds)\
+    rdd_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
+        .select("Issue Date", "Street Name", "House Number", "Violation County").rdd\
         .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]] and \
             x["Violation County"] in ["NY", "BX", "BK", "Q", "ST"])\
         .map(map_row_add_year)\
@@ -83,5 +78,6 @@ if __name__ == "__main__":
     
     df_output = sqlContext.createDataFrame(rdd_location_year_counts, schema=output_schema)
     
-    df_output.show()
+    # df_output.show(100)
+    # print(df_output.count())
     df_output.write.csv(sys.argv[3] if len(sys.argv) > 3 else 'final_output', header=False)
