@@ -7,22 +7,6 @@ import os
 def csv_df(sqlContext, filepath):
     return sqlContext.read.csv(filepath, multiLine=True, header=True, escape="\"", inferSchema=True)
 
-def violation_data_df(sparkcontext, sqlContext, *filenames):
-    filenames = ["2015.csv", "2016.csv", "2017.csv", "2018.csv", "2019.csv"]
-    violation_rdds = [
-        csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", fname))\
-            .select(F.col("House Number"),F.col("Street Name"), F.col("Violation County"),\
-                F.year(F.to_date(F.split(F.col("Issue Date"), ",")[0], "MM/dd/yyyy")).alias("year"))\
-            .rdd
-        for fname in filenames]
-
-    schema = StructType([StructField('House Number', StringType(), True),\
-        StructField('Street Name', StringType(), True),\
-        StructField('Violation County', StringType(), True),\
-        StructField('year', IntegerType(), True)])
-    rdd_violations = sparkcontext.union(violation_rdds)
-    return sqlContext.createDataFrame(rdd_violations, schema)
-
 if __name__ == "__main__":
     sc = SparkContext()
     sqlContext = SQLContext(sc)
@@ -36,36 +20,25 @@ if __name__ == "__main__":
     def map_row_add_year(x):
         from datetime import datetime
         from pyspark.sql import Row
-        row_builder = x.asDict()
+        row_dict = x.asDict()
         if x["Issue Date"] is not None:
-            row_builder["year"] = datetime.strptime(row_builder["Issue Date"].split(",")[0], "%m/%d/%Y").year
-        if x["Street Name"] is not None:
-            row_builder["Street Name"] = row_builder["Street Name"].upper()
-        return Row(**row_builder)
+            row_dict["year"] = datetime.strptime(row_dict["Issue Date"].split(",")[0], "%m/%d/%Y").year
+        return row_dict
 
     rdd_violations = sc.union(violation_rdds)\
-        .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]])\
+        .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]] and \
+            x["Violation County"] in ["NY", "BX", "BK", "Q", "ST"])\
         .map(map_row_add_year)\
-        .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)
+        .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)\
+        .map(lambda x: (' '.join(x["Street Name"].upper().split()), x))\
+        .groupByKey().map(lambda x: (' '.join(x[0].split()), (1, x[1])))
 
     rdd_nyc_cscl = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
         .select("PHYSICALID", "FULL_STREE", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
         .rdd\
         .filter(lambda x: None not in [
-            x["PHYSICALID"], x["FULL_STREE"], x["BOROCODE"], x["L_LOW_HN"], x["L_HIGH_HN"], x["R_LOW_HN"], x["R_HIGH_HN"]
-        ])
-
-    def map_partitions_to_rdd_violations(rows):
-        county_to_boro_codes = {"NY": 1, "BX": 2, "BK": 3, "Q": 4, "ST": 5}
-        for row in rows:
-            boro = county_to_boro_codes.get(row["Violation County"], None)
-            if boro == None:
-                continue
-            yield (' '.join(row["Street Name"].split()), row)
-        
-    rdd_violations = rdd_violations.mapPartitions(map_partitions_to_rdd_violations)\
-        .groupByKey().map(lambda x: (x[0], (1, x[1])))
-    rdd_nyc_cscl = rdd_nyc_cscl.map(lambda x: (' '.join(x["FULL_STREE"].split()), x)).groupByKey().map(lambda x: (x[0], (0, x[1])))
+            x["PHYSICALID"], x["FULL_STREE"], x["BOROCODE"], x["L_LOW_HN"], x["L_HIGH_HN"], x["R_LOW_HN"], x["R_HIGH_HN"]])\
+        .map(lambda x: (' '.join(x["FULL_STREE"].split()), x)).groupByKey().map(lambda x: (x[0], (0, x[1])))
 
     def map_partitions_cscl_violations(records):
         last_cscls = None
