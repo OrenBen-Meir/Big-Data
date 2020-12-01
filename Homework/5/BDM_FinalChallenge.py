@@ -58,10 +58,24 @@ if __name__ == "__main__":
                 last_cscls = r
     
     def map_to_output_row(entry):
-        ols_coeff = "NaN"
+        import numpy as np
+        def calc_ols_coeff(pair_lst):
+            if len(pair_lst) < 2:
+                return "N/A"
+            arr_pair_list = np.array(pair_lst)
+            arr_x = arr_pair_list[:,0]
+            arr_y = arr_pair_list[:,1]
+            n = len(arr_pair_list)
+            
+            bottom = n*np.sum(arr_x*arr_x) - np.sum(arr_x)**2
+            if bottom == 0:
+                return "N/A"
+            top = n*np.sum(arr_x*arr_y) - np.sum(arr_x)*np.sum(arr_y)
+            return str(round(top/bottom, 2))
+        ols_coeff = calc_ols_coeff(list(entry[1]))
         year_counts = dict(entry[1])
-        return [entry[0], year_counts.get(2015, "NaN"), year_counts.get(2016, "NaN"), year_counts.get(2017, "NaN"), \
-            year_counts.get(2018, "NaN"), year_counts.get(2019, "NaN"), ols_coeff]
+        return [entry[0], year_counts.get(2015, "N/A"), year_counts.get(2016, "N/A"), year_counts.get(2017, "N/A"), \
+            year_counts.get(2018, "N/A"), year_counts.get(2019, "N/A"), ols_coeff]
     
     rdd_location_year_counts: RDD = rdd_nyc_cscl.union(rdd_violations).sortByKey()\
         .mapPartitions(map_partitions_cscl_violations)\
