@@ -50,13 +50,15 @@ if __name__ == "__main__":
                         for cscl_row in last_cscls[1][1]:
                             try:
                                 house_number = int(violation_row["House Number"])
+                            except:
+                                break
+                            try:
                                 if ((house_number%2 == 1 and int(cscl_row["L_LOW_HN"]) <= house_number and house_number <= int(cscl_row["L_HIGH_HN"])) or \
                                     (house_number%2 == 0 and int(cscl_row["R_LOW_HN"]) <= house_number and house_number <= int(cscl_row["R_HIGH_HN"]))):
                                     yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
+                                    break
                             except (ValueError, TypeError) as e:
                                 continue
-                else:
-                    break
             else:
                 last_cscls = r
     
