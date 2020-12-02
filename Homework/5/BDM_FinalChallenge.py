@@ -25,9 +25,8 @@ if __name__ == "__main__":
             x["Violation County"] in {"NY", "BX", "BK", "Q", "ST"})\
         .map(map_row_add_year)\
         .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)\
-        .map(lambda x: ((x["Street Name"].upper(), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), x))\
+        .map(lambda x: ((' '.join(x["Street Name"].upper().split()), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), x))\
         .groupByKey().map(lambda x: (x[0], (1, x[1])))
-        # ' '.join(x.upper().split())
 
     rdd_nyc_cscl = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
         .select("PHYSICALID", "FULL_STREE", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
@@ -35,7 +34,7 @@ if __name__ == "__main__":
         .filter(lambda x: \
             None not in [x["PHYSICALID"], x["FULL_STREE"], x["BOROCODE"], x["L_LOW_HN"], x["L_HIGH_HN"], x["R_LOW_HN"], x["R_HIGH_HN"]] \
             and len([x for x in [x["FULL_STREE"], x["ST_LABEL"]] if x == None]) != 2)\
-        .flatMap(lambda x: [((x["FULL_STREE"].upper(), x["BOROCODE"]), x), ((x["ST_LABEL"].upper(), x["BOROCODE"]), x)])\
+        .flatMap(lambda x: [((' '.join(x["FULL_STREE"].split()), x["BOROCODE"]), x), ((' '.join(x["ST_LABEL"].split()), x["BOROCODE"]), x)])\
         .groupByKey().map(lambda x: (x[0], (0, x[1])))
     
     def map_partitions_cscl_violations(records):
