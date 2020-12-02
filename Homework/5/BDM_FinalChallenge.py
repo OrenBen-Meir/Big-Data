@@ -35,7 +35,7 @@ if __name__ == "__main__":
         .filter(lambda x: \
             None not in [x["PHYSICALID"], x["FULL_STREE"], x["BOROCODE"], x["L_LOW_HN"], x["L_HIGH_HN"], x["R_LOW_HN"], x["R_HIGH_HN"]] \
             and len([x for x in [x["FULL_STREE"], x["ST_LABEL"]] if x == None]) != 2)\
-        .flatMap(lambda x: [((x["FULL_STREE"], x["BOROCODE"]), x), ((x["ST_LABEL"], x["BOROCODE"]), x)])\
+        .flatMap(lambda x: [((x["FULL_STREE"].upper(), x["BOROCODE"]), x), ((x["ST_LABEL"].upper(), x["BOROCODE"]), x)])\
         .groupByKey().map(lambda x: (x[0], (0, x[1])))
     
     def map_partitions_cscl_violations(records):
