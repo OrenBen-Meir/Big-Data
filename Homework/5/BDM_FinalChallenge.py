@@ -38,20 +38,22 @@ if __name__ == "__main__":
         .groupByKey().map(lambda x: (x[0], (0, x[1])))
     
     def map_partitions_cscl_violations(records):
+        def house_num_tuple(x):
+            return tuple([int(n) for n in x.split("-")])
         last_cscls = None
         for r in records:
             mode = r[1][0]
             if mode == 1:
                 if last_cscls != None and r[0] == last_cscls[0]:
                     for violation_row in r[1][1]:
+                        try:
+                            house_number = house_num_tuple(violation_row["House Number"])
+                        except:
+                            break
                         for cscl_row in last_cscls[1][1]:
                             try:
-                                house_number = int(violation_row["House Number"])
-                            except:
-                                break
-                            try:
-                                if ((house_number%2 == 1 and int(cscl_row["L_LOW_HN"]) <= house_number and house_number <= int(cscl_row["L_HIGH_HN"])) or \
-                                    (house_number%2 == 0 and int(cscl_row["R_LOW_HN"]) <= house_number and house_number <= int(cscl_row["R_HIGH_HN"]))):
+                                if ((house_number[len(house_number)-1]%2 == 1 and house_num_tuple(cscl_row["L_LOW_HN"]) <= house_number and house_number <= house_num_tuple(cscl_row["L_HIGH_HN"])) or \
+                                    (house_number[len(house_number)-1]%2 == 0 and house_num_tuple(cscl_row["R_LOW_HN"]) <= house_number and house_number <= house_num_tuple(cscl_row["R_HIGH_HN"]))):
                                     yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
                                     break
                             except (ValueError, TypeError) as e:
