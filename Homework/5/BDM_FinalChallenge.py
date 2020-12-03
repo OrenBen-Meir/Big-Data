@@ -53,7 +53,7 @@ if __name__ == "__main__":
                         try:
                             house_number = house_num_tuple(violation_row["House Number"])
                         except:
-                            break
+                            continue
                         for cscl_row in last_cscls[1][1]:
                             try:
                                 if ((house_number[len(house_number)-1]%2 == 1 and \
