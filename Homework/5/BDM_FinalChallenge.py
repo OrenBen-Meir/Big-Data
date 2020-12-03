@@ -52,7 +52,7 @@ if __name__ == "__main__":
                     for violation_row in r[1][1]:
                         try:
                             house_number = house_num_lst(violation_row["House Number"])
-                            if len(house_number == 0):
+                            if len(house_number) == 0:
                                 continue
                         except:
                             continue
