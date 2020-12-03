@@ -38,12 +38,12 @@ if __name__ == "__main__":
         .groupByKey().map(lambda x: (x[0], (0, x[1])))
     
     def map_partitions_join_cscl_violations(records):
-        def house_num_tuple(x):
+        def house_num_lst(x):
             return [int(n) for n in x.split("-") if n != ""]
-        def house_limit_tuple(x, is_low):
+        def house_limit_lst(x, is_low):
             if x == '-':
                 return [float('-inf') if is_low else float('inf')]
-            return house_num_tuple(x)
+            return house_num_lst(x)
         last_cscls = None
         for r in records:
             mode = r[1][0]
@@ -51,20 +51,22 @@ if __name__ == "__main__":
                 if last_cscls != None and r[0] == last_cscls[0]:
                     for violation_row in r[1][1]:
                         try:
-                            house_number = house_num_tuple(violation_row["House Number"])
+                            house_number = house_num_lst(violation_row["House Number"])
+                            if len(house_number == 0):
+                                continue
                         except:
                             continue
                         for cscl_row in last_cscls[1][1]:
                             try:
                                 if ((house_number[len(house_number)-1]%2 == 1 and \
-                                        house_limit_tuple(cscl_row["L_LOW_HN"], True) <= house_number and \
-                                        house_number <= house_limit_tuple(cscl_row["L_HIGH_HN"], False)) or \
+                                        house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
+                                        house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], False)) or \
                                     (house_number[len(house_number)-1]%2 == 0 and \
-                                        house_limit_tuple(cscl_row["R_LOW_HN"], True) <= house_number and \
-                                        house_number <= house_limit_tuple(cscl_row["R_HIGH_HN"], False))):
+                                        house_limit_lst(cscl_row["R_LOW_HN"], True) <= house_number and \
+                                        house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], False))):
                                     yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
                                     break
-                            except (ValueError, TypeError) as e:
+                            except (ValueError, TypeError, IndexError) as e:
                                 continue
             else:
                 last_cscls = r
