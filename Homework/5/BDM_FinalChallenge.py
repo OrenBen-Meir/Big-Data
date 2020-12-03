@@ -17,7 +17,7 @@ if __name__ == "__main__":
         row_dict = x.asDict()
         if x["Issue Date"] is not None:
             row_dict["year"] = datetime.strptime(row_dict["Issue Date"].split(",")[0], "%m/%d/%Y").year
-        return row_dict
+        return Row(**row_dict)
 
     rdd_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County").rdd\
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         .rdd\
         .filter(lambda x: \
             None not in [x["PHYSICALID"], x["FULL_STREE"], x["BOROCODE"], x["L_LOW_HN"], x["L_HIGH_HN"], x["R_LOW_HN"], x["R_HIGH_HN"]] \
-            and not all([x == None for x in [x["FULL_STREE"], x["ST_LABEL"]]]))\
+            and any([x != None for x in [x["FULL_STREE"], x["ST_LABEL"]]]))\
         .flatMap(lambda x: [((' '.join(x["FULL_STREE"].split()), x["BOROCODE"]), x), ((' '.join(x["ST_LABEL"].split()), x["BOROCODE"]), x)])\
         .groupByKey().map(lambda x: (x[0], (0, x[1])))
     
@@ -56,7 +56,7 @@ if __name__ == "__main__":
                                 continue
                         except:
                             continue
-                        for cscl_row in last_cscls[1][1]:
+                        for cscl_row in last_cscls[1]:
                             try:
                                 if ((house_number[len(house_number)-1]%2 == 1 and \
                                         house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
@@ -69,7 +69,10 @@ if __name__ == "__main__":
                             except (ValueError, TypeError, IndexError) as e:
                                 continue
             else:
-                last_cscls = r
+                last_cscls = (r[0], set(r[1][1]))
+                for cscl_row in last_cscls[1]:
+                    for y in range(2015, 2020):
+                        yield (cscl_row["PHYSICALID"], y), 0
     
     def map_to_output_row(entry):
         import numpy as np
@@ -108,6 +111,6 @@ if __name__ == "__main__":
     
     df_output = sqlContext.createDataFrame(rdd_location_year_counts, schema=output_schema)
     
-    # df_output.show(100)
+    # df_output.show(1000)
     # print(df_output.count())
     df_output.write.csv(sys.argv[3] if len(sys.argv) > 3 else 'final_output', header=False)
