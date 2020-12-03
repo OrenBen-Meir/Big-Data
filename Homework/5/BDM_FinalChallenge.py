@@ -22,17 +22,14 @@ if __name__ == "__main__":
     # read every csv file in a chosen directory (marked by *.csv) to a dataframe
     # select chosen fields, convert to rdd
     # add year to row, then filter year tp be from 2015 to 2019
-    # map to the form (whitespace_trimmed_streetname, boro_number), row
-    # group by key and map into the form (whitespace_trimmed_streetname, boro_number), (mode_number, violation row collection)
-    # mode_number is 1 to indicate violations when joining
+    # map to the form (whitespace_trimmed_streetname, boro_number), (mode_number, row)
     rdd_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County").rdd\
         .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]] and \
             x["Violation County"] in {"NY", "BX", "BK", "Q", "ST"})\
         .map(map_row_add_year)\
         .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)\
-        .map(lambda x: ((' '.join(x["Street Name"].upper().split()), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), x))\
-        .groupByKey().map(lambda x: (x[0], (1, x[1])))
+        .map(lambda x: ((' '.join(x["Street Name"].upper().split()), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), (1, x)))
 
     # read chosen csv into a dataframe
     # select required fields and convert to rdd
@@ -70,30 +67,30 @@ if __name__ == "__main__":
         for r in records:
             mode = r[1][0]
             if mode == 1: # if r is from violations 
-                if last_cscls != None and r[0] == last_cscls[0]:
-                    for violation_row in r[1][1]:
-                        # house_number is a number list from "House Number" from violations. 
-                        # Skips if it turns "House Number" can't be converted to a number list or is empty 
+                if last_cscls != None and r[0] == last_cscls[0]: # keys must match
+                    violation_row = r[1][1]
+                    # house_number is a number list from "House Number" from violations. 
+                    # Skips if it turns "House Number" can't be converted to a number list or is empty 
+                    try:
+                        house_number = house_num_lst(violation_row["House Number"])
+                        if len(house_number) == 0:
+                            continue
+                    except:
+                        continue
+                    for cscl_row in last_cscls[1]: # search street centerline data such that house number
                         try:
-                            house_number = house_num_lst(violation_row["House Number"])
-                            if len(house_number) == 0:
-                                continue
+                            if ((house_number[len(house_number)-1]%2 == 1 and \
+                                    house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
+                                    house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], False)) or \
+                                (house_number[len(house_number)-1]%2 == 0 and \
+                                    house_limit_lst(cscl_row["R_LOW_HN"], True) <= house_number and \
+                                    house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], False))):
+                                yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
+                                break
                         except:
                             continue
-                        for cscl_row in last_cscls[1]: # search street centerline data such that house number
-                            try:
-                                if ((house_number[len(house_number)-1]%2 == 1 and \
-                                        house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
-                                        house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], False)) or \
-                                    (house_number[len(house_number)-1]%2 == 0 and \
-                                        house_limit_lst(cscl_row["R_LOW_HN"], True) <= house_number and \
-                                        house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], False))):
-                                    yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
-                                    break
-                            except (ValueError, TypeError, IndexError) as e:
-                                continue
             else:
-                last_cscls = (r[0], set(r[1][1]))
+                last_cscls = (r[0], r[1][1])
     
     def map_to_output_row(entry):
         import numpy as np
@@ -116,8 +113,9 @@ if __name__ == "__main__":
         # for year in range(2015,2020):
         #     if year not in year_counts:
         #         year_counts[year] = 0
-        return [entry[0], year_counts[2015], year_counts[2016], year_counts[2017], \
+        L = [entry[0], year_counts[2015], year_counts[2016], year_counts[2017], \
             year_counts[2018], year_counts[2019], calc_ols_coeff(list(year_counts.items()))]
+        return ",".join([str(x) for x in L])
     
     #efficiently join by unioning rdd violations, sort by key, then mapping partitions to emit values based on join condition.
     # the emmitted valies are of the form (physical id, year), 1
@@ -125,23 +123,14 @@ if __name__ == "__main__":
     # reduce by key so we get year counts for each year of a street segment
     # map into the form (physical id, (year, counts))
     # then we group by key to collect all of the year counts for physical id
-    # map the phys id grouping into a list representing the output csv which includes year counts and the ols coefficient
+    # map the phys id grouping into a comma seperated list string which is a csv line
     rdd_location_year_counts: RDD = (rdd_nyc_cscl + rdd_violations).sortByKey()\
         .mapPartitions(map_partitions_join_cscl_violations).union(rdd_nyc_cscl_base_zero)\
         .reduceByKey(lambda x, y: x + y).map(lambda x: (x[0][0], (x[0][1], x[1])))\
         .groupByKey().sortByKey().map(map_to_output_row)
+    
+    # for line in rdd_location_year_counts.take(1000):
+    #     print(line)
+    # print("rows count:", rdd_location_year_counts.count())
 
-    output_schema = StructType([StructField('PHYSICALID', LongType(), True),\
-        StructField('COUNT_2015', StringType(), True),\
-        StructField('COUNT_2016', StringType(), True),\
-        StructField('COUNT_2017', StringType(), True),\
-        StructField('COUNT_2018', StringType(), True),\
-        StructField('COUNT_2019', StringType(), True),\
-        StructField('OLS_COEF', StringType(), True)])
-    
-    # create output dataframe out of schema and save as csv without header
-    df_output = sqlContext.createDataFrame(rdd_location_year_counts, schema=output_schema)
-    
-    # df_output.show(1000)
-    # print(df_output.count())
-    df_output.write.csv(sys.argv[3] if len(sys.argv) > 3 else 'final_output', header=False)
+    rdd_location_year_counts.saveAsTextFile(sys.argv[3] if len(sys.argv) > 3 else 'final_output')
