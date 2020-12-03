@@ -22,14 +22,17 @@ if __name__ == "__main__":
     # read every csv file in a chosen directory (marked by *.csv) to a dataframe
     # select chosen fields, convert to rdd
     # add year to row, then filter year tp be from 2015 to 2019
-    # map to the form (whitespace_trimmed_streetname, boro_number), (mode_number, row)
+    # map to the form (whitespace_trimmed_streetname, boro_number), row
+    # group by key and map into the form (whitespace_trimmed_streetname, boro_number), (mode_number, violation row collection)
+    # mode_number is 1 to indicate violations when joining
     rdd_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County").rdd\
         .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]] and \
             x["Violation County"] in {"NY", "BX", "BK", "Q", "ST"})\
         .map(map_row_add_year)\
         .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)\
-        .map(lambda x: ((' '.join(x["Street Name"].upper().split()), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), (1, x)))
+        .map(lambda x: ((' '.join(x["Street Name"].upper().split()), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), x))\
+        .groupByKey().map(lambda x: (x[0], (1, x[1])))
 
     # read chosen csv into a dataframe
     # select required fields and convert to rdd
@@ -68,27 +71,27 @@ if __name__ == "__main__":
             mode = r[1][0]
             if mode == 1: # if r is from violations 
                 if last_cscls != None and r[0] == last_cscls[0]: # keys must match
-                    violation_row = r[1][1]
-                    # house_number is a number list from "House Number" from violations. 
-                    # Skips if it turns "House Number" can't be converted to a number list or is empty 
-                    try:
-                        house_number = house_num_lst(violation_row["House Number"])
-                        if len(house_number) == 0:
-                            continue
-                    except:
-                        continue
-                    for cscl_row in last_cscls[1]: # search street centerline data such that house number
+                    for violation_row in r[1][1]:
+                        # house_number is a number list from "House Number" from violations. 
+                        # Skips if it turns "House Number" can't be converted to a number list or is empty 
                         try:
-                            if ((house_number[len(house_number)-1]%2 == 1 and \
-                                    house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
-                                    house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], False)) or \
-                                (house_number[len(house_number)-1]%2 == 0 and \
-                                    house_limit_lst(cscl_row["R_LOW_HN"], True) <= house_number and \
-                                    house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], False))):
-                                yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
-                                break
+                            house_number = house_num_lst(violation_row["House Number"])
+                            if len(house_number) == 0:
+                                continue
                         except:
                             continue
+                        for cscl_row in last_cscls[1]: # search street centerline data such that house number
+                            try:
+                                if ((house_number[len(house_number)-1]%2 == 1 and \
+                                        house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
+                                        house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], False)) or \
+                                    (house_number[len(house_number)-1]%2 == 0 and \
+                                        house_limit_lst(cscl_row["R_LOW_HN"], True) <= house_number and \
+                                        house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], False))):
+                                    yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
+                                    break
+                            except:
+                                continue
             else:
                 last_cscls = (r[0], r[1][1])
     
