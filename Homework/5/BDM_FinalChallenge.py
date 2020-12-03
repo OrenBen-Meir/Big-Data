@@ -33,13 +33,17 @@ if __name__ == "__main__":
         .rdd\
         .filter(lambda x: \
             None not in [x["PHYSICALID"], x["FULL_STREE"], x["BOROCODE"], x["L_LOW_HN"], x["L_HIGH_HN"], x["R_LOW_HN"], x["R_HIGH_HN"]] \
-            and len([x for x in [x["FULL_STREE"], x["ST_LABEL"]] if x == None]) != 2)\
+            and not all([x == None for x in [x["FULL_STREE"], x["ST_LABEL"]]]))\
         .flatMap(lambda x: [((' '.join(x["FULL_STREE"].split()), x["BOROCODE"]), x), ((' '.join(x["ST_LABEL"].split()), x["BOROCODE"]), x)])\
         .groupByKey().map(lambda x: (x[0], (0, x[1])))
     
-    def map_partitions_cscl_violations(records):
+    def map_partitions_join_cscl_violations(records):
         def house_num_tuple(x):
-            return tuple([int(n) for n in x.split("-")])
+            return [int(n) for n in x.split("-") if n != ""]
+        def house_limit_tuple(x, is_low):
+            if x == '-':
+                return [float('-inf') if is_low else float('inf')]
+            return house_num_tuple(x)
         last_cscls = None
         for r in records:
             mode = r[1][0]
@@ -52,8 +56,12 @@ if __name__ == "__main__":
                             break
                         for cscl_row in last_cscls[1][1]:
                             try:
-                                if ((house_number[len(house_number)-1]%2 == 1 and house_num_tuple(cscl_row["L_LOW_HN"]) <= house_number and house_number <= house_num_tuple(cscl_row["L_HIGH_HN"])) or \
-                                    (house_number[len(house_number)-1]%2 == 0 and house_num_tuple(cscl_row["R_LOW_HN"]) <= house_number and house_number <= house_num_tuple(cscl_row["R_HIGH_HN"]))):
+                                if ((house_number[len(house_number)-1]%2 == 1 and \
+                                        house_limit_tuple(cscl_row["L_LOW_HN"], True) <= house_number and \
+                                        house_number <= house_limit_tuple(cscl_row["L_HIGH_HN"], False)) or \
+                                    (house_number[len(house_number)-1]%2 == 0 and \
+                                        house_limit_tuple(cscl_row["R_LOW_HN"], True) <= house_number and \
+                                        house_number <= house_limit_tuple(cscl_row["R_HIGH_HN"], False))):
                                     yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
                                     break
                             except (ValueError, TypeError) as e:
@@ -84,7 +92,7 @@ if __name__ == "__main__":
             year_counts[2018], year_counts[2019], calc_ols_coeff(list(year_counts.items()))]
     
     rdd_location_year_counts: RDD = rdd_nyc_cscl.union(rdd_violations).sortByKey()\
-        .mapPartitions(map_partitions_cscl_violations)\
+        .mapPartitions(map_partitions_join_cscl_violations)\
         .reduceByKey(lambda x, y: x + y).map(lambda x: (x[0][0], (x[0][1], x[1])))\
         .groupByKey().sortByKey().map(map_to_output_row)
 
