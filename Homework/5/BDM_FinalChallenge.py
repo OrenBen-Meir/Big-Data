@@ -27,11 +27,17 @@ if __name__ == "__main__":
     # mode_number is 1 to indicate violations when joining
     rdd_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County").rdd\
-        .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]] and \
-            x["Violation County"] in {"NY", "BX", "BK", "Q", "ST"})\
+        .filter(lambda x: None not in [x["Issue Date"], x["Street Name"], x["House Number"]])\
         .map(map_row_add_year)\
         .filter(lambda x: 2015 <= x["year"] and x["year"] <= 2019)\
-        .map(lambda x: ((' '.join(x["Street Name"].upper().split()), ["NY", "BX", "BK", "Q", "ST"].index(x["Violation County"])+1), x))\
+        .map(lambda x: ((' '.join(x["Street Name"].upper().split()),\
+            {"NY": 1, "MN": 1, \
+                "BX": 2, "BRONX": 2, \
+                "BK": 3, "K": 33, "KINGS": 3, "KING": 3, "BKLYN": 4, \
+                "Q": 4, "QUEEN": 4, "QN": 4, "QNS": 4, "QU": 4, \
+                "ST": 5, "SI": 5}.get(x["Violation County"], None)\
+            ), x))\
+        .filter(lambda x: x[0][1] != None)\
         .groupByKey().map(lambda x: (x[0], (1, x[1])))
 
     # read chosen csv into a dataframe
@@ -44,7 +50,7 @@ if __name__ == "__main__":
         .select("PHYSICALID", "FULL_STREE", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
         .rdd
 
-    rdd_nyc_cscl = rdd_nyc_cscl_rows.filter(lambda x: None not in [x["PHYSICALID"], x["BOROCODE"]])\
+    rdd_nyc_cscl = rdd_nyc_cscl_rows.filter(lambda x: None != x["PHYSICALID"])\
         .flatMap(lambda x: [\
             ((' '.join(street.split()), x["BOROCODE"]), x) \
             for street in [x["FULL_STREE"], x["ST_LABEL"]] \
@@ -118,7 +124,7 @@ if __name__ == "__main__":
         #         year_counts[year] = 0
         L = [entry[0], year_counts[2015], year_counts[2016], year_counts[2017], \
             year_counts[2018], year_counts[2019], calc_ols_coeff(list(year_counts.items()))]
-        return ",".join([str(x) for x in L])
+        return ",".join(map(str,L))
     
     #efficiently join by unioning rdd violations, sort by key, then mapping partitions to emit values based on join condition.
     # the emmitted valies are of the form (physical id, year), 1
