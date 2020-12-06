@@ -41,12 +41,11 @@ if __name__ == "__main__":
     # trim streetname of any extra white spaces and collect violations based on a common streetname and borough.
     # The violations collection row is called `violations`
     df_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
-        .select("Issue Date", "Street Name", "House Number", "Violation County")\
-        .filter("`Issue Date` is not null and `Street Name` is not null and \
-            `House Number` is not null and `Violation County` is not null ")\
+        .select("Issue Date", "Street Name", "House Number", "Violation County").dropna()\
         .withColumn("year", date_to_year(F.col("Issue Date")))\
         .filter("2015 <= year and year <= 2019")\
         .withColumn("BOROCODE", boro_to_borocode(F.col("Violation County")))\
+        .dropna(subset=["BOROCODE"])\
         .filter("BOROCODE is not null")\
         .groupBy(trim_street(F.col("Street Name")).alias("Street_Name"), "BOROCODE")\
         .agg(F.collect_list(F.struct("year", "House Number")).alias("violations"))
@@ -54,19 +53,19 @@ if __name__ == "__main__":
 
 
     #Read street centerline data
-    #Select needed fields and make sure physical id is null
+    #Select needed fields and make sure physical id is not null
     df_nyc_cscl_rows = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
         .select("PHYSICALID", "FULL_STREE", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
-        .filter("PHYSICALID is not null")
+        .dropna(subset=["PHYSICALID"])
     # df_nyc_cscl_rows.show()
 
     # Seperate duplicate the cscl fields based on transorming FULL_STREE or ST_LABEL into street name and then union them.
     # The street names are trimmed and FULL_STREE and ST_LABEL get dropped.
     # trim streetname of any extra white spaces and collect cscl data based on a common streetname and borough.
     # The violations collection row is called `cscls`
-    df_nyc_cscl = df_nyc_cscl_rows.filter("FULL_STREE is not null").withColumn("Street_Name", trim_street(F.col("FULL_STREE")))\
-        .union(df_nyc_cscl_rows.filter("ST_LABEL is not null").withColumn("Street_Name", trim_street(F.col("ST_LABEL"))))\
-        .drop("FULL_STREE", "ST_LABEL")\
+    df_nyc_cscl = \
+        df_nyc_cscl_rows.dropna(subset=["FULL_STREE"]).withColumn("Street_Name", trim_street(F.col("FULL_STREE"))).drop("FULL_STREE")\
+        .union(df_nyc_cscl_rows.dropna(subset=["ST_LABEL"]).withColumn("Street_Name", trim_street(F.col("ST_LABEL"))).drop("ST_LABEL"))\
         .groupBy("Street_Name", "BOROCODE")\
         .agg(F.collect_list(F.struct("PHYSICALID", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")).alias("csclS"))
     # df_nyc_cscl.show()
@@ -91,8 +90,7 @@ if __name__ == "__main__":
             used_violations = set() # violations no longer needed
             for cscl in row["csclS"]:
                 for violation in violations_set: # for every available violations
-                    try:
-                        # housenumber is a list of numbers that were dash seperated (if no dash a singular list)
+                    try: # housenumber is a list of numbers that were dash seperated (if no dash a singular list)
                         house_number = house_num_lst(violation["House Number"]) 
                     except (ValueError, TypeError) as e:
                         used_violations.add(violation) # housenumber bad so violation scrapped
@@ -122,7 +120,7 @@ if __name__ == "__main__":
     def map_to_output_row(record):
         import numpy as np
 
-        def calc_ols_coeff(pair_lst): # calculate ols coefficient
+        def calc_ols_coeff(pair_lst): # calculate ols coefficient, there are floating point error bugs
             if len(pair_lst) < 2:
                 return "N/A"
             arr_pair_list = np.array(pair_lst, dtype=np.int64)
@@ -133,14 +131,12 @@ if __name__ == "__main__":
             bottom = n*np.sum(arr_x*arr_x) - np.sum(arr_x)**2
             if bottom == 0:
                 return "N/A"
-            if all(map(lambda x: x == 0, arr_y)):
-                return 0
             top = n*np.sum(arr_x*arr_y) - np.sum(arr_x)*np.sum(arr_y)
             return str(round(top/bottom, 2))
-        year_counts_tuples = [(x["year"], x["count"]) for x in record["yearcounts"]]
+        year_counts_tuples = [(int(x["year"]), int(x["count"])) for x in record["yearcounts"]]
         year_counts_dict = dict(year_counts_tuples)
         L = [record[0], year_counts_dict[2015], year_counts_dict[2016], year_counts_dict[2017], \
-            year_counts_dict[2018], year_counts_dict[2019], calc_ols_coeff(list(year_counts_tuples))]
+            year_counts_dict[2018], year_counts_dict[2019], calc_ols_coeff(year_counts_tuples)]
         return ",".join(map(str,L))
 
     # take the joined dataframe and flatmap it such that it returns a generator of (physical id, year) counts
