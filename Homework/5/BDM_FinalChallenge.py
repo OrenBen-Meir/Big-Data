@@ -82,7 +82,7 @@ if __name__ == "__main__":
                         # Skips if it turns "House Number" can't be converted to a number list or is empty 
                         try:
                             house_number = house_num_lst(violation_row["House Number"])
-                            if len(house_number) == 0:
+                            if len(house_number) > 0:
                                 for cscl_row in last_cscls[1]: # search street centerline data such that house number
                                     if ((house_number[len(house_number)-1]%2 == 1 and \
                                             house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
