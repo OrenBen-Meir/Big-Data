@@ -13,11 +13,13 @@ if __name__ == "__main__":
     
     @F.udf(returnType=IntegerType())
     def date_to_year(x):
+        '''Parse issued date field into year'''
         from datetime import datetime
         return int(x.split(",")[0].split("/")[2])
 
     @F.udf(returnType=IntegerType())
     def boro_to_borocode(x):
+        '''Convert boro string to borocode'''
         return {"NY": 1, "MN": 1, "BX": 2, "BRONX": 2, \
             "BK": 3, "K": 33, "KINGS": 3, "KING": 3, "BKLYN": 4, \
             "Q": 4, "QUEEN": 4, "QN": 4, "QNS": 4, "QU": 4, \
@@ -25,13 +27,19 @@ if __name__ == "__main__":
 
     @F.udf(returnType=StringType())
     def trim_street(x):
+        '''Remove repeating whitespaces'''
         return ' '.join(x.upper().split())
 
     count_schema = StructType([StructField('PHYSICALID', IntegerType(), True),\
         StructField('year', IntegerType(), True),\
         StructField('count', IntegerType(), True)])
 
-
+    # get the violation data into the dataframe
+    # filter for null values
+    # extract year from issued date and make sure the year is in the 2015 to 2019 range
+    # convert boro to borocode and only make sure nyc boroughs go through by using the null filter
+    # trim streetname of any extra white spaces and collect violations based on a common streetname and borough.
+    # The violations collection row is called `violations`
     df_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County")\
         .filter("`Issue Date` is not null and `Street Name` is not null and \
@@ -44,11 +52,18 @@ if __name__ == "__main__":
         .agg(F.collect_list(F.struct("year", "House Number")).alias("violations"))
     # df_violations.show()
 
+
+    #Read street centerline data
+    #Select needed fields and make sure physical id is null
     df_nyc_cscl_rows = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
         .select("PHYSICALID", "FULL_STREE", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
         .filter("PHYSICALID is not null")
     # df_nyc_cscl_rows.show()
 
+    # Seperate duplicate the cscl fields based on transorming FULL_STREE or ST_LABEL into street name and then union them.
+    # The street names are trimmed and FULL_STREE and ST_LABEL get dropped.
+    # trim streetname of any extra white spaces and collect cscl data based on a common streetname and borough.
+    # The violations collection row is called `cscls`
     df_nyc_cscl = df_nyc_cscl_rows.filter("FULL_STREE is not null").withColumn("Street_Name", trim_street(F.col("FULL_STREE")))\
         .union(df_nyc_cscl_rows.filter("ST_LABEL is not null").withColumn("Street_Name", trim_street(F.col("ST_LABEL"))))\
         .drop("FULL_STREE", "ST_LABEL")\
@@ -56,6 +71,7 @@ if __name__ == "__main__":
         .agg(F.collect_list(F.struct("PHYSICALID", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")).alias("csclS"))
     # df_nyc_cscl.show()
 
+    # join violations and cscl based on street and boro, left outer so streets without violations are included
     df_join: DataFrame = df_nyc_cscl.join(df_violations, on=["Street_Name", "BOROCODE"], how="left_outer")
 
     def flatmap_to_id_years(row):
@@ -66,35 +82,36 @@ if __name__ == "__main__":
                 # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
                 return [float('inf') if is_high else float('-inf')]
             return house_num_lst(x)
-        counts = {}
+        counts = {} # dictionary with key being phycal id and year and value is number of violations
         for cscl in row["csclS"]:
-            for y in range(2015,2020):
+            for y in range(2015,2020): # Violation count by default is 0
                 counts[(cscl["PHYSICALID"], y)] = 0
-        if row["violations"] != None:
-            violations_set = set(row["violations"])
-            used_violations = set()
+        if row["violations"] != None: # if violations arent empty
+            violations_set = set(row["violations"]) # create a set for faster means of removing data
+            used_violations = set() # violations no longer needed
             for cscl in row["csclS"]:
-                for y in range(2015,2020):
-                    counts[(cscl["PHYSICALID"], y)] = 0
-                for violation in violations_set:
+                for violation in violations_set: # for every available violations
                     try:
-                        house_number = house_num_lst(violation["House Number"])
+                        # housenumber is a list of numbers that were dash seperated (if no dash a singular list)
+                        house_number = house_num_lst(violation["House Number"]) 
                     except (ValueError, TypeError) as e:
-                        used_violations.add(violation)
+                        used_violations.add(violation) # housenumber bad so violation scrapped
                     try:
-                        is_odd = house_number[len(house_number)-1]%2
-                        if len(house_number) > 0:
+                        if len(house_number) > 0: # make sure list is not empty
+                            is_odd = house_number[len(house_number)-1]%2
                             if ((is_odd == 1 and house_limit_lst(cscl["L_LOW_HN"], False) <= house_number and \
                                     house_number <= house_limit_lst(cscl["L_HIGH_HN"], True)) or \
                                 (is_odd == 0 and house_limit_lst(cscl["R_LOW_HN"], False) <= house_number and \
                                     house_number <= house_limit_lst(cscl["R_HIGH_HN"], True))):
 
-                                counts[(cscl["PHYSICALID"], violation["year"])] += 1
-                                used_violations.add(violation)
+                                counts[(cscl["PHYSICALID"], violation["year"])] += 1 # increment counts
+                                used_violations.add(violation) # violation already matched with location so no longer needed
+                        else:
+                            used_violations.add(violation) # housenumber bad so violation scrapped
                     except:
                         continue
-            violations_set.difference_update(used_violations)
-        for x in counts.items():
+            violations_set.difference_update(used_violations) # clean violations_set of used violations
+        for x in counts.items(): # generate output of the form (phys id, year, counts)
             yield (x[0][0], x[0][1], x[1])
 
     # df_join.show(n=100)
@@ -105,7 +122,7 @@ if __name__ == "__main__":
     def map_to_output_row(record):
         import numpy as np
 
-        def calc_ols_coeff(pair_lst):
+        def calc_ols_coeff(pair_lst): # calculate ols coefficient
             if len(pair_lst) < 2:
                 return "N/A"
             arr_pair_list = np.array(pair_lst, dtype=np.int64)
@@ -126,14 +143,21 @@ if __name__ == "__main__":
             year_counts_dict[2018], year_counts_dict[2019], calc_ols_coeff(list(year_counts_tuples))]
         return ",".join(map(str,L))
 
+    # take the joined dataframe and flatmap it such that it returns a generator of (physical id, year) counts
+    # group by phycial id where the counts for each year are aggregated into the yearcounts row
+    # sort by physical id
     df_counts = sqlContext.createDataFrame(df_join.rdd.flatMap(flatmap_to_id_years), schema=count_schema)\
         .groupBy("PHYSICALID").agg(F.collect_list(F.struct("year", "count")).alias("yearcounts")).sort("PHYSICALID")\
         
-
     # df_counts.show(n=1000)
+
+    # take this phys id aggregation and convert to rdd so it will be used to create a csv string.
+    # It will have rows for each year counts and calculate the ols coefficient for the year counts
     rdd_counts: RDD = df_counts.rdd.map(map_to_output_row)
+
     # for c in rdd_counts.take(1000):
     #     print(c)
     # print(str(rdd_counts.count()) + " rows")
 
+    # save to csv
     rdd_counts.saveAsTextFile(sys.argv[3] if len(sys.argv) > 3 else 'final_output')
