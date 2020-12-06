@@ -97,8 +97,6 @@ if __name__ == "__main__":
                 for violation in violations_set: # for every available violations
                     # housenumber is a list of numbers that were dash seperated (if no dash a singular list)
                     house_number = house_num_lst(violation["House Number"]) 
-                        house_number = house_num_lst(violation["House Number"]) 
-                    house_number = house_num_lst(violation["House Number"]) 
                     if len(house_number) > 0: # make sure list is not empty
                         is_odd = house_number[len(house_number)-1]%2
                         if ((is_odd == 1 and house_limit_lst(cscl["L_LOW_HN"], False) <= house_number and \
