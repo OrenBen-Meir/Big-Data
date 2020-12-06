@@ -42,11 +42,11 @@ if __name__ == "__main__":
     # The violations collection row is called `violations`
     df_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County").dropna()\
+        .filter(F.col("House Number").rlike("^(\d+)((-(\d+))*)$"))\
         .withColumn("year", date_to_year(F.col("Issue Date")))\
         .filter("2015 <= year and year <= 2019")\
         .withColumn("BOROCODE", boro_to_borocode(F.col("Violation County")))\
         .dropna(subset=["BOROCODE"])\
-        .filter("BOROCODE is not null")\
         .groupBy(trim_street(F.col("Street Name")).alias("Street_Name"), "BOROCODE")\
         .agg(F.collect_list(F.struct("year", "House Number")).alias("violations"))
     # df_violations.show()
@@ -81,6 +81,8 @@ if __name__ == "__main__":
                 # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
                 return [float('inf') if is_high else float('-inf')]
             return house_num_lst(x)
+        import re
+        house_num_pattern = re.compile("^(\d+)((-(\d+))*)$")# house number must be numbers seperated by hyphens
         counts = {} # dictionary with key being phycal id and year and value is number of violations
         for cscl in row["csclS"]:
             for y in range(2015,2020): # Violation count by default is 0
@@ -89,25 +91,23 @@ if __name__ == "__main__":
             violations_set = set(row["violations"]) # create a set for faster means of removing data
             used_violations = set() # violations no longer needed
             for cscl in row["csclS"]:
+                if any(map(lambda c: cscl[c] != None and not house_num_pattern.match(cscl[c]), \
+                    ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"])):
+                    continue # skip cscls with unusable house number limits
                 for violation in violations_set: # for every available violations
-                    try: # housenumber is a list of numbers that were dash seperated (if no dash a singular list)
+                    # housenumber is a list of numbers that were dash seperated (if no dash a singular list)
+                    house_number = house_num_lst(violation["House Number"]) 
                         house_number = house_num_lst(violation["House Number"]) 
-                    except (ValueError, TypeError) as e:
-                        used_violations.add(violation) # housenumber bad so violation scrapped
-                    try:
-                        if len(house_number) > 0: # make sure list is not empty
-                            is_odd = house_number[len(house_number)-1]%2
-                            if ((is_odd == 1 and house_limit_lst(cscl["L_LOW_HN"], False) <= house_number and \
-                                    house_number <= house_limit_lst(cscl["L_HIGH_HN"], True)) or \
-                                (is_odd == 0 and house_limit_lst(cscl["R_LOW_HN"], False) <= house_number and \
-                                    house_number <= house_limit_lst(cscl["R_HIGH_HN"], True))):
+                    house_number = house_num_lst(violation["House Number"]) 
+                    if len(house_number) > 0: # make sure list is not empty
+                        is_odd = house_number[len(house_number)-1]%2
+                        if ((is_odd == 1 and house_limit_lst(cscl["L_LOW_HN"], False) <= house_number and \
+                                house_number <= house_limit_lst(cscl["L_HIGH_HN"], True)) or \
+                            (is_odd == 0 and house_limit_lst(cscl["R_LOW_HN"], False) <= house_number and \
+                                house_number <= house_limit_lst(cscl["R_HIGH_HN"], True))):
 
-                                counts[(cscl["PHYSICALID"], violation["year"])] += 1 # increment counts
-                                used_violations.add(violation) # violation already matched with location so no longer needed
-                        else:
-                            used_violations.add(violation) # housenumber bad so violation scrapped
-                    except:
-                        continue
+                            counts[(cscl["PHYSICALID"], violation["year"])] += 1 # increment counts
+                            used_violations.add(violation) # violation already matched with location so no longer needed
             violations_set.difference_update(used_violations) # clean violations_set of used violations
         for x in counts.items(): # generate output of the form (phys id, year, counts)
             yield (x[0][0], x[0][1], x[1])
