@@ -83,21 +83,17 @@ if __name__ == "__main__":
                         try:
                             house_number = house_num_lst(violation_row["House Number"])
                             if len(house_number) == 0:
-                                continue
+                                for cscl_row in last_cscls[1]: # search street centerline data such that house number
+                                    if ((house_number[len(house_number)-1]%2 == 1 and \
+                                            house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
+                                            house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], False)) or \
+                                        (house_number[len(house_number)-1]%2 == 0 and \
+                                            house_limit_lst(cscl_row["R_LOW_HN"], True) <= house_number and \
+                                            house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], False))):
+                                        yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
+                                        break
                         except:
                             continue
-                        for cscl_row in last_cscls[1]: # search street centerline data such that house number
-                            try:
-                                if ((house_number[len(house_number)-1]%2 == 1 and \
-                                        house_limit_lst(cscl_row["L_LOW_HN"], True) <= house_number and \
-                                        house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], False)) or \
-                                    (house_number[len(house_number)-1]%2 == 0 and \
-                                        house_limit_lst(cscl_row["R_LOW_HN"], True) <= house_number and \
-                                        house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], False))):
-                                    yield (cscl_row["PHYSICALID"], violation_row["year"]), 1
-                                    break
-                            except:
-                                continue
             else:
                 last_cscls = (r[0], r[1][1])
     
@@ -135,8 +131,8 @@ if __name__ == "__main__":
         .reduceByKey(lambda x, y: x + y).map(lambda x: (x[0][0], (x[0][1], x[1])))\
         .groupByKey().sortByKey().map(map_to_output_row)
     
-    # for line in rdd_location_year_counts.take(1000):
-    #     print(line)
-    # print("rows count:", rdd_location_year_counts.count())
+    for line in rdd_location_year_counts.take(1000):
+        print(line)
+    print("rows count:", rdd_location_year_counts.count())
 
     rdd_location_year_counts.saveAsTextFile(sys.argv[3] if len(sys.argv) > 3 else 'final_output')
