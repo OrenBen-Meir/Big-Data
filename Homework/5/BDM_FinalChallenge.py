@@ -131,8 +131,8 @@ if __name__ == "__main__":
         .reduceByKey(lambda x, y: x + y).map(lambda x: (x[0][0], (x[0][1], x[1])))\
         .groupByKey().sortByKey().map(map_to_output_row)
     
-    for line in rdd_location_year_counts.take(1000):
-        print(line)
-    print("rows count:", rdd_location_year_counts.count())
+    # for line in rdd_location_year_counts.take(1000):
+    #     print(line)
+    # print("rows count:", rdd_location_year_counts.count())
 
     rdd_location_year_counts.saveAsTextFile(sys.argv[3] if len(sys.argv) > 3 else 'final_output')
