@@ -119,9 +119,6 @@ if __name__ == "__main__":
             return str(round(top/bottom, 2))
 
         year_counts = dict(entry[1])
-        # for year in range(2015,2020):
-        #     if year not in year_counts:
-        #         year_counts[year] = 0
         L = [entry[0], year_counts[2015], year_counts[2016], year_counts[2017], \
             year_counts[2018], year_counts[2019], calc_ols_coeff(list(year_counts.items()))]
         return ",".join(map(str,L))
