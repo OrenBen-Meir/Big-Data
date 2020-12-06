@@ -23,7 +23,7 @@ if __name__ == "__main__":
         return {"NY": 1, "MN": 1, "BX": 2, "BRONX": 2, \
             "BK": 3, "K": 33, "KINGS": 3, "KING": 3, "BKLYN": 4, \
             "Q": 4, "QUEEN": 4, "QN": 4, "QNS": 4, "QU": 4, \
-            "ST": 5, "SI": 5}.get(x, None)
+            "ST": 5, "SI": 5, "R": 5, "RICHMOND": 5}.get(x, None)
 
     @F.udf(returnType=StringType())
     def trim_street(x):
