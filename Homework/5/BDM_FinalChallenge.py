@@ -1,6 +1,6 @@
 from pyspark import SparkContext, SQLContext, RDD
 from pyspark.sql import functions as F, Row, DataFrame
-from pyspark.sql.types import StructType, StructField, LongType, StringType, IntegerType
+from pyspark.sql.types import StructType, StructField, LongType, StringType, IntegerType, ArrayType
 import sys
 import os
 
@@ -11,6 +11,106 @@ if __name__ == "__main__":
     sc = SparkContext()
     sqlContext = SQLContext(sc)
     
+    @F.udf(returnType=IntegerType())
+    def date_to_year(x):
+        from datetime import datetime
+        return int(x.split(",")[0].split("/")[2])
+
+    @F.udf(returnType=IntegerType())
+    def boro_to_borocode(x):
+        return {"NY": 1, "MN": 1, "BX": 2, "BRONX": 2, \
+            "BK": 3, "K": 33, "KINGS": 3, "KING": 3, "BKLYN": 4, \
+            "Q": 4, "QUEEN": 4, "QN": 4, "QNS": 4, "QU": 4, \
+            "ST": 5, "SI": 5}.get(x, None)
+
+    @F.udf(returnType=StringType())
+    def trim_street(x):
+        return ' '.join(x.upper().split())
+
+    count_schema = StructType([StructField('PHYSICALID', IntegerType(), True),\
+        StructField('year', IntegerType(), True),\
+        StructField('count', IntegerType(), True)])
+
+
+    df_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
+        .select("Issue Date", "Street Name", "House Number", "Violation County")\
+        .filter("`Issue Date` is not null and `Street Name` is not null and \
+            `House Number` is not null and `Violation County` is not null ")\
+        .withColumn("year", date_to_year(F.col("Issue Date")))\
+        .filter("2015 <= year and year <= 2019")\
+        .withColumn("BOROCODE", boro_to_borocode(F.col("Violation County")))\
+        .filter("BOROCODE is not null")\
+        .groupBy(trim_street(F.col("Street Name")).alias("Street_Name"), "BOROCODE")\
+        .agg(F.collect_list(F.struct("year", "House Number")).alias("violations"))
+    df_violations.show()
+
+    df_nyc_cscl_rows = csv_df(sqlContext, sys.argv[2] if len(sys.argv) > 2 else "nyc_cscl.csv")\
+        .select("PHYSICALID", "FULL_STREE", "ST_LABEL", "BOROCODE", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN")\
+        .filter("PHYSICALID is not null")
+    df_nyc_cscl_rows.show()
+
+    df_nyc_cscl = df_nyc_cscl_rows.filter("FULL_STREE is not null").withColumn("Street_Name", trim_street(F.col("FULL_STREE")))\
+        .union(df_nyc_cscl_rows.filter("ST_LABEL is not null").withColumn("Street_Name", trim_street(F.col("ST_LABEL"))))\
+        .drop("FULL_STREE", "ST_LABEL")\
+        .groupBy("Street_Name", "BOROCODE")\
+        .agg(F.collect_list(F.struct("PHYSICALID", "L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"))\
+            .alias("csclS"))
+    df_nyc_cscl.show()
+
+    df_nyc_cscl_base_zero = sqlContext.createDataFrame(\
+        df_nyc_cscl_rows.select("PHYSICALID").rdd.flatMap(lambda x: [(x["PHYSICALID"], y, 0) for y in range(2015, 2020)]),\
+        schema=count_schema)
+    df_nyc_cscl_base_zero.show()
+
+    df_join: DataFrame = df_nyc_cscl.join(df_violations, on=["Street_Name", "BOROCODE"])
+
+    def flatmap_to_id_years(row):
+        def house_num_lst(x): # convert housenumber which is '-' seperated into a list of numbers for comparison
+            return [int(n) for n in x.split("-") if n != ""]
+        def house_limit_lst(x, is_high): # same as house_num_lst but for houselimits
+            if x == '-' or x == None: 
+                # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
+                return [float('inf') if is_high else float('-inf')]
+            return house_num_lst(x)
+        for violation in row["violations"]:
+            yield(1,0)
+            try:
+                house_number = house_num_lst(violation["House Number"])
+                is_odd = house_number[len(house_number)-1]%2
+                if len(house_number) > 0:
+                    for cscl in row["csclS"]: # search street centerline data such that house number
+                        if ((is_odd == 1 and \
+                                house_limit_lst(cscl_row["L_LOW_HN"], False) <= house_number and \
+                                house_number <= house_limit_lst(cscl_row["L_HIGH_HN"], True)) or \
+                            (is_odd == 0 and \
+                                house_limit_lst(cscl_row["R_LOW_HN"], False) <= house_number and \
+                                house_number <= house_limit_lst(cscl_row["R_HIGH_HN"], True))):
+                            yield cscl["PHYSICALID"], violation["year"]
+                            break
+            except:
+                continue
+
+    df_join.show(n=100)
+
+    id_year_schema = StructType([StructField('PHYSICALID', IntegerType(), True),\
+        StructField('year', IntegerType(), True)])
+
+    df_id_years = sqlContext.createDataFrame(df_join.rdd.flatMap(flatmap_to_id_years), schema=id_year_schema)
+
+    df_id_years.show(n=400)
+
+    exit(0)
+
+        # .map(lambda x: ((' '.join(x["Street Name"].upper().split()),\
+        #     {"NY": 1, "MN": 1, \
+        #         "BX": 2, "BRONX": 2, \
+        #         "BK": 3, "K": 33, "KINGS": 3, "KING": 3, "BKLYN": 4, \
+        #         "Q": 4, "QUEEN": 4, "QN": 4, "QNS": 4, "QU": 4, \
+        #         "ST": 5, "SI": 5}.get(x["Violation County"], None)\
+        #     ), x))\
+        # .filter(lambda x: x[0][1] != None)\
+        # .groupByKey().map(lambda x: (x[0], (1, x[1])))
+
     def map_row_add_year(x): # add year from issued date in violations data
         from datetime import datetime
         from pyspark.sql import Row
