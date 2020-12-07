@@ -141,7 +141,11 @@ if __name__ == "__main__":
     # group by phycial id where the counts for each year are aggregated into the yearcounts row
     # sort by physical id
     df_counts = sqlContext.createDataFrame(df_join.rdd.flatMap(flatmap_to_id_years), schema=count_schema)\
+        .groupBy("PHYSICALID", "year").agg(F.sum("count").alias("count"))\
         .groupBy("PHYSICALID").agg(F.collect_list(F.struct("year", "count")).alias("yearcounts")).sort("PHYSICALID")\
+    
+    # for x in df_counts.rdd.take(1000):
+    #     print("\ncounts: ", x)
         
     # df_counts.show(n=1000)
 
