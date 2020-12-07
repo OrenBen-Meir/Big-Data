@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # The violations collection row is called `violations`
     df_violations = csv_df(sqlContext, os.path.join(sys.argv[1] if len(sys.argv) > 1 else "nyc_parking_violation", "*.csv"))\
         .select("Issue Date", "Street Name", "House Number", "Violation County").dropna()\
-        .filter(F.col("House Number").rlike("^(\d+)$"))\
+        .filter(F.col("House Number").rlike("^(\d+)((-(\d+))*)$"))\
         .withColumn("year", date_to_year(F.col("Issue Date")))\
         .filter("2015 <= year and year <= 2019")\
         .withColumn("BOROCODE", boro_to_borocode(F.col("Violation County")))\
@@ -106,14 +106,13 @@ if __name__ == "__main__":
     def flatmap_to_id_years_counts(row):
         def house_num_lst(x): # convert housenumber which is a hyphen seperated mumber into a list of numbers for comparison
             return [int(n) for n in x.split("-") if n != ""]
-        # def house_limit_lst(x, is_high): # same as house_num_lst but for houselimits
-        #     if x == '-' or x == None: 
-        #         # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
-        #         return [float('inf') if is_high else float('-inf')]
-        #     return house_num_lst(x)
+        def house_limit_lst(x, is_high): # same as house_num_lst but for houselimits
+            if x == '-' or x == None: 
+                # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
+                return [float('inf') if is_high else float('-inf')]
+            return house_num_lst(x)
         import re
-        # original regex: "^(\d+)((-(\d+))*)$"
-        house_num_pattern = re.compile("^(\d+)$")# house number must be numbers seperated by hyphens
+        house_num_pattern = re.compile("^(\d+)((-(\d+))*)$")# house number must be numbers seperated by hyphens
         counts = {} # dictionary with key being phycal id and year and value is number of violations
         for cscl in row["csclS"]:
             for y in range(2015,2020): # Violation count by default is 0
