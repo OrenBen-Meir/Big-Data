@@ -93,7 +93,7 @@ if __name__ == "__main__":
             for cscl in row["csclS"]:
                 # if any(map(lambda c: cscl[c] != None and not house_num_pattern.match(cscl[c]), \
                 #     ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"])):
-                if any(map(lambda c: cscl[c] in [None "-"] or not house_num_pattern.match(cscl[c]), \
+                if any(map(lambda c: cscl[c] in [None, "-"] or not house_num_pattern.match(cscl[c]), \
                     ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"])):
                     continue # skip cscls with unusable house number limits
                 for violation in violations_set: # for every available violations
