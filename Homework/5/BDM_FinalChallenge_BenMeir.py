@@ -1,3 +1,33 @@
+# CSC445 Big Data - Huy Vo
+# Name: Oren Ben-Meir
+# EMPLID: 14144874
+# Final Project
+
+# To run, please type the following
+'''
+export PYTHON_VERSION=3
+spark-submit \
+    --num-executors 6 \
+    --executor-cores 5 \
+    --executor-memory 10G \
+    BDM_FinalChallenge_BenMeir.py <parking violation folder path> <Street Centerline CSCL folder path> <output folder path to getmerge>
+
+In this case:
+
+Parking violation folder = '/data/share/bdm/nyc_parking_violation'
+CSCL File = '/data/share/bdm/nyc_cscl.csv'
+Output Folder = 'oren_final_output'
+
+To copy/paste: 
+
+export PYTHON_VERSION=3
+spark-submit \
+    --num-executors 6 \
+    --executor-cores 5 \
+    --executor-memory 10G \
+    BDM_FinalChallenge_BenMeir.py /data/share/bdm/nyc_parking_violation /data/share/bdm/nyc_cscl.csv oren_final_output
+'''
+
 from pyspark import SparkContext, SQLContext, RDD
 from pyspark.sql import functions as F, Row, DataFrame
 from pyspark.sql.types import StructType, StructField, LongType, StringType, IntegerType, ArrayType
