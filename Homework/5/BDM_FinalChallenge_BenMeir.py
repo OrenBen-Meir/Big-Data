@@ -104,8 +104,8 @@ if __name__ == "__main__":
     df_join: DataFrame = df_nyc_cscl.join(df_violations, on=["Street_Name", "BOROCODE"], how="left_outer")
 
     def flatmap_to_id_years_counts(row):
-        # def house_num_lst(x): # convert housenumber which is a hyphen seperated mumber into a list of numbers for comparison
-        #     return [int(n) for n in x.split("-") if n != ""]
+        def house_num_lst(x): # convert housenumber which is a hyphen seperated mumber into a list of numbers for comparison
+            return [int(n) for n in x.split("-") if n != ""]
         # def house_limit_lst(x, is_high): # same as house_num_lst but for houselimits
         #     if x == '-' or x == None: 
         #         # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
@@ -127,13 +127,13 @@ if __name__ == "__main__":
                     continue # skip cscls with unusable house number limits
                 for violation in violations_set: # for every available violations
                     # housenumber is a list of numbers that were dash seperated (if no dash a singular list)
-                    house_number = int(violation["House Number"]) 
+                    house_number = house_num_lst(violation["House Number"]) 
                     if len(house_number) > 0: # make sure list is not empty
                         is_odd = house_number[len(house_number)-1]%2
-                        if ((is_odd == 1 and int(cscl["L_LOW_HN"]) <= house_number and \
-                                house_number <= int(cscl["L_HIGH_HN"])) or \
-                            (is_odd == 0 and int(cscl["R_LOW_HN"]) <= house_number and \
-                                house_number <= int(cscl["R_HIGH_HN"]))):
+                        if ((is_odd == 1 and house_num_lst(cscl["L_LOW_HN"]) <= house_number and \
+                                house_number <= house_num_lst(cscl["L_HIGH_HN"])) or \
+                            (is_odd == 0 and house_num_lst(cscl["R_LOW_HN"]) <= house_number and \
+                                house_number <= house_num_lst(cscl["R_HIGH_HN"]))):
 
                             counts[(cscl["PHYSICALID"], violation["year"])] += 1 # increment counts
                             used_violations.add(violation) # violation already matched with location so no longer needed
