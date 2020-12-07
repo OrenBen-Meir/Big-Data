@@ -65,7 +65,7 @@ if __name__ == "__main__":
         StructField('count', IntegerType(), True)])
 
     # get the violation data into the dataframe
-    # filter for null values
+    # filter for null values  and make sure home address has the right format
     # extract year from issued date and make sure the year is in the 2015 to 2019 range
     # convert boro to borocode and only make sure nyc boroughs go through by using the null filter
     # trim streetname of any extra white spaces and collect violations based on a common streetname and borough.
