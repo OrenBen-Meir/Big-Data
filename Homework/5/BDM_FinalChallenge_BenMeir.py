@@ -122,7 +122,7 @@ if __name__ == "__main__":
             violations_set = set(row["violations"]) # create a set for faster means of removing data
             used_violations = set() # violations no longer needed
             for cscl in row["csclS"]:
-                if any(map(lambda c: cscl[c] != None or not house_num_pattern.match(cscl[c]), \
+                if any(map(lambda c: cscl[c] == None or not house_num_pattern.match(cscl[c]), \
                     ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"])):
                     continue # skip cscls with unusable house number limits
                 for violation in violations_set: # for every available violations
