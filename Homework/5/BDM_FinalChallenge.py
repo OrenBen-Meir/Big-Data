@@ -77,9 +77,9 @@ if __name__ == "__main__":
         def house_num_lst(x): # convert housenumber which is '-' seperated into a list of numbers for comparison
             return [int(n) for n in x.split("-") if n != ""]
         def house_limit_lst(x, is_high): # same as house_num_lst but for houselimits
-            # if x == '-' or x == None: 
-            #     # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
-            #     return [float('inf') if is_high else float('-inf')]
+            if x == '-' or x == None: 
+                # if house limit is not around, if it is the lower bound, use -infinity, otherwise use infinity
+                return [float('inf') if is_high else float('-inf')]
             return house_num_lst(x)
         import re
         house_num_pattern = re.compile("^(\d+)((-(\d+))*)$")# house number must be numbers seperated by hyphens
@@ -91,9 +91,7 @@ if __name__ == "__main__":
             violations_set = set(row["violations"]) # create a set for faster means of removing data
             used_violations = set() # violations no longer needed
             for cscl in row["csclS"]:
-                # if any(map(lambda c: cscl[c] != None and not house_num_pattern.match(cscl[c]), \
-                #     ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"])):
-                if any(map(lambda c: cscl[c] in [None, "-"] or not house_num_pattern.match(cscl[c]), \
+                if any(map(lambda c: cscl[c] != None and not house_num_pattern.match(cscl[c]), \
                     ["L_LOW_HN", "L_HIGH_HN", "R_LOW_HN", "R_HIGH_HN"])):
                     continue # skip cscls with unusable house number limits
                 for violation in violations_set: # for every available violations
