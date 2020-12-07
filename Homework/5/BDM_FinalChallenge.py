@@ -73,8 +73,8 @@ if __name__ == "__main__":
     # join violations and cscl based on street and boro, left outer so streets without violations are included
     df_join: DataFrame = df_nyc_cscl.join(df_violations, on=["Street_Name", "BOROCODE"], how="left_outer")
 
-    def flatmap_to_id_years(row):
-        def house_num_lst(x): # convert housenumber which is '-' seperated into a list of numbers for comparison
+    def flatmap_to_id_years_counts(row):
+        def house_num_lst(x): # convert housenumber which is a hyphen seperated mumber into a list of numbers for comparison
             return [int(n) for n in x.split("-") if n != ""]
         def house_limit_lst(x, is_high): # same as house_num_lst but for houselimits
             if x == '-' or x == None: 
@@ -112,10 +112,7 @@ if __name__ == "__main__":
 
     # df_join.show(n=100)
 
-    id_year_schema = StructType([StructField('PHYSICALID', IntegerType(), True),\
-        StructField('year', IntegerType(), True)])
-
-    def map_to_output_row(record):
+    def map_to_output_row(record): # creates a csv row in the form 'physical id, 2015 counts, ...., 2019 counts, ols coefficient
         import numpy as np
 
         def calc_ols_coeff(pair_lst): # calculate ols coefficient, there are floating point error bugs
@@ -137,10 +134,11 @@ if __name__ == "__main__":
             year_counts_dict[2018], year_counts_dict[2019], calc_ols_coeff(year_counts_tuples)]
         return ",".join(map(str,L))
 
-    # take the joined dataframe and flatmap it such that it returns a generator of (physical id, year) counts
+    # take the joined dataframe and flatmap it such that it returns a generator of the counts of [physical id,year] pair.
+    # Then group by physical id and year to sum all counts of such since physical ids and years may repeat
     # group by phycial id where the counts for each year are aggregated into the yearcounts row
     # sort by physical id
-    df_counts = sqlContext.createDataFrame(df_join.rdd.flatMap(flatmap_to_id_years), schema=count_schema)\
+    df_counts = sqlContext.createDataFrame(df_join.rdd.flatMap(flatmap_to_id_years_counts), schema=count_schema)\
         .groupBy("PHYSICALID", "year").agg(F.sum("count").alias("count"))\
         .groupBy("PHYSICALID").agg(F.collect_list(F.struct("year", "count")).alias("yearcounts")).sort("PHYSICALID")\
     
@@ -150,7 +148,7 @@ if __name__ == "__main__":
     # df_counts.show(n=1000)
 
     # take this phys id aggregation and convert to rdd so it will be used to create a csv string.
-    # It will have rows for each year counts and calculate the ols coefficient for the year counts
+    # It will have a row for physical id, rows for each year counts and calculate the ols coefficient for the year counts
     rdd_counts: RDD = df_counts.rdd.map(map_to_output_row)
 
     # for c in rdd_counts.take(1000):
